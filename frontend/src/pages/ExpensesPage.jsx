@@ -79,10 +79,10 @@ function ExpenseModal({ expense, categories, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">{isEdit ? 'Edit Expense' : 'Add Expense'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={18} /></button>
+          <button onClick={() => onClose()} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -115,7 +115,7 @@ function ExpenseModal({ expense, categories, onClose }) {
             </div>
           </div>
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+            <button type="button" onClick={() => onClose()} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="flex-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
               {isSubmitting ? 'Saving...' : isEdit ? 'Update' : 'Add'}
             </button>
@@ -140,6 +140,7 @@ export default function ExpensesPage() {
   const [sort, setSort] = useState('date');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
   const fileRef = useRef(null);
 
   const { data: catData } = useCategories();
@@ -147,7 +148,7 @@ export default function ExpensesPage() {
 
   // Build params — use month/year filter OR date_from/date_to
   const params = {
-    page, limit: 50, sort, order,
+    page, limit, sort, order,
     ...(filterMonth !== null ? { month: filterMonth, year: filterYear } : {}),
     ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
   };
@@ -217,10 +218,24 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Expenses</h1>
-        <div className="flex gap-2">
-          <button onClick={handleExport} className={btnOutline}><Download size={15} /> Export</button>
-          <button onClick={() => fileRef.current?.click()} className={btnOutline}><Upload size={15} /> Import</button>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Expenses</h1>
+          {pagination && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{pagination.total} expense{pagination.total !== 1 ? 's' : ''}</p>}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Show</span>
+            <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden text-xs font-medium">
+              {[5, 10, 15, 20, 25].map((n) => (
+                <button key={n} onClick={() => { setLimit(n); setPage(1); }}
+                  className={`px-2.5 py-1 transition-colors ${limit === n ? 'bg-emerald-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={handleExport} className={btnOutline}><Download size={15} /><span className="hidden sm:inline">Export</span></button>
+          <button onClick={() => fileRef.current?.click()} className={btnOutline}><Upload size={15} /><span className="hidden sm:inline">Import</span></button>
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
           <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
             <Plus size={15} /> Add
@@ -313,13 +328,42 @@ export default function ExpensesPage() {
               </div>
 
               {pagination && pagination.total_pages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{pagination.total} total</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">Previous</button>
-                    <span className="px-3 py-1 text-xs text-gray-600 dark:text-gray-400">{page} / {pagination.total_pages}</span>
-                    <button onClick={() => setPage((p) => Math.min(pagination.total_pages, p + 1))} disabled={page === pagination.total_pages} className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">Next</button>
-                  </div>
+                <div className="flex justify-center px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+                  {(() => {
+                    const cur = pagination.page;
+                    const total = pagination.total_pages;
+                    const range = [];
+                    for (let i = 1; i <= total; i++) {
+                      if (i === 1 || i === total || (i >= cur - 1 && i <= cur + 1)) range.push(i);
+                    }
+                    const withEllipsis = [];
+                    let prev = null;
+                    for (const p of range) {
+                      if (prev !== null && p - prev > 1) withEllipsis.push('...' + p);
+                      withEllipsis.push(p);
+                      prev = p;
+                    }
+                    return (
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={cur <= 1}
+                          className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                          <ChevronLeft size={14} />
+                        </button>
+                        {withEllipsis.map((p, i) =>
+                          typeof p === 'string'
+                            ? <span key={p + i} className="text-xs text-gray-300 dark:text-gray-600 px-1">…</span>
+                            : <button key={p} onClick={() => setPage(p)}
+                                className={`min-w-[28px] h-7 rounded-lg text-xs font-medium transition-colors ${p === cur ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                                {p}
+                              </button>
+                        )}
+                        <button onClick={() => setPage((p) => Math.min(total, p + 1))} disabled={cur >= total}
+                          className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </>

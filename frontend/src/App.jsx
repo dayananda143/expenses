@@ -15,7 +15,10 @@ import IndiaLedgerPage from './pages/IndiaLedgerPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BudgetsPage from './pages/BudgetsPage';
 import UsersPage from './pages/UsersPage';
+import HospitalPage from './pages/HospitalPage';
+import SalaryPage from './pages/SalaryPage';
 import { useWorkspace } from './contexts/WorkspaceContext';
+import { useAuth } from './contexts/AuthContext';
 
 function WorkspaceRoute() {
   const { workspace } = useWorkspace();
@@ -26,6 +29,11 @@ function WorkspaceRoute() {
 function ExpensesRoute() {
   const { workspace } = useWorkspace();
   return workspace === 'india' ? <IndiaLedgerPage /> : <ExpensesPage />;
+}
+
+function HospitalRoute() {
+  const { user } = useAuth();
+  return (user?.is_admin || user?.hospital_access) ? <HospitalPage /> : <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
@@ -50,6 +58,8 @@ export default function App() {
             <Route path="expenses"   element={<ExpensesRoute />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="budgets"    element={<BudgetsPage />} />
+            <Route path="hospital"   element={<HospitalRoute />} />
+            <Route path="salary"     element={<SalaryPage />} />
             <Route element={<AdminRoute />}>
               <Route path="users" element={<UsersPage />} />
             </Route>

@@ -12,6 +12,8 @@ const dashboardRouter  = require('./routes/dashboard');
 const usersRouter      = require('./routes/users');
 const accountsRouter        = require('./routes/accounts');
 const accountPaymentsRouter = require('./routes/accountPayments');
+const hospitalRouter        = require('./routes/hospital');
+const salaryRouter          = require('./routes/salary');
 const errorHandler     = require('./middleware/errorHandler');
 const requireAuth      = require('./middleware/auth');
 
@@ -37,8 +39,10 @@ app.use('/api/categories', categoriesRouter);
 app.use('/api/budgets',    budgetsRouter);
 app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/users',      usersRouter);
-app.use('/api/accounts',         accountsRouter);
-app.use('/api/account-payments', accountPaymentsRouter);
+app.use('/api/accounts',          accountsRouter);
+app.use('/api/account-payments',  accountPaymentsRouter);
+app.use('/api/hospital-expenses', hospitalRouter);
+app.use('/api/salary',           salaryRouter);
 app.use(errorHandler);
 
 db.ready.then(() => {

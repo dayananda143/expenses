@@ -17,9 +17,9 @@ function parseWorkspaces(raw) {
 router.get('/', requireAdmin, (req, res, next) => {
   try {
     const users = db.prepare(
-      'SELECT id, username, is_admin, is_active, workspaces, accounts_access, created_at FROM users ORDER BY created_at ASC'
+      'SELECT id, username, is_admin, is_active, workspaces, accounts_access, hospital_access, created_at FROM users ORDER BY created_at ASC'
     ).all();
-    res.json({ data: users.map((u) => ({ ...u, workspaces: parseWorkspaces(u.workspaces), accounts_access: !!u.accounts_access })) });
+    res.json({ data: users.map((u) => ({ ...u, workspaces: parseWorkspaces(u.workspaces), accounts_access: !!u.accounts_access, hospital_access: !!u.hospital_access })) });
   } catch (err) {
     next(err);
   }
@@ -28,7 +28,7 @@ router.get('/', requireAdmin, (req, res, next) => {
 // POST /api/users  (admin only)
 router.post('/', requireAdmin, async (req, res, next) => {
   try {
-    const { username, password, is_admin, workspaces, accounts_access } = req.body;
+    const { username, password, is_admin, workspaces, accounts_access, hospital_access } = req.body;
     if (!username?.trim() || !password) {
       return res.status(400).json({ error: 'username and password are required' });
     }
@@ -43,13 +43,13 @@ router.post('/', requireAdmin, async (req, res, next) => {
 
     const hash = await bcrypt.hash(password, 12);
     const result = db.prepare(
-      'INSERT INTO users (username, password_hash, is_admin, workspaces, accounts_access) VALUES (?, ?, ?, ?, ?)'
-    ).run(username.toLowerCase().trim(), hash, is_admin ? 1 : 0, JSON.stringify(wsArray), accounts_access ? 1 : 0);
+      'INSERT INTO users (username, password_hash, is_admin, workspaces, accounts_access, hospital_access) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(username.toLowerCase().trim(), hash, is_admin ? 1 : 0, JSON.stringify(wsArray), accounts_access ? 1 : 0, hospital_access ? 1 : 0);
 
     seedCategories(db, result.lastInsertRowid);
 
-    const user = db.prepare('SELECT id, username, is_admin, is_active, workspaces, accounts_access, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: { ...user, workspaces: parseWorkspaces(user.workspaces), accounts_access: !!user.accounts_access } });
+    const user = db.prepare('SELECT id, username, is_admin, is_active, workspaces, accounts_access, hospital_access, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ data: { ...user, workspaces: parseWorkspaces(user.workspaces), accounts_access: !!user.accounts_access, hospital_access: !!user.hospital_access } });
   } catch (err) {
     next(err);
   }
@@ -60,14 +60,17 @@ router.patch('/:id', requireAdmin, async (req, res, next) => {
   try {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    if (user.id === req.user.id) return res.status(400).json({ error: 'Cannot modify your own account' });
 
-    const is_active       = req.body.is_active       !== undefined ? (req.body.is_active       ? 1 : 0) : user.is_active;
-    const is_admin        = req.body.is_admin        !== undefined ? (req.body.is_admin        ? 1 : 0) : user.is_admin;
-    const accounts_access = req.body.accounts_access !== undefined ? (req.body.accounts_access ? 1 : 0) : user.accounts_access;
+    const isSelf = user.id === req.user.id;
+
+    // Self-edit: only username and password are allowed
+    const is_active        = isSelf ? user.is_active       : (req.body.is_active        !== undefined ? (req.body.is_active        ? 1 : 0) : user.is_active);
+    const is_admin         = isSelf ? user.is_admin        : (req.body.is_admin         !== undefined ? (req.body.is_admin         ? 1 : 0) : user.is_admin);
+    const accounts_access  = isSelf ? user.accounts_access : (req.body.accounts_access  !== undefined ? (req.body.accounts_access  ? 1 : 0) : user.accounts_access);
+    const hospital_access  = isSelf ? user.hospital_access : (req.body.hospital_access  !== undefined ? (req.body.hospital_access  ? 1 : 0) : user.hospital_access);
 
     let workspaces = parseWorkspaces(user.workspaces);
-    if (Array.isArray(req.body.workspaces)) {
+    if (!isSelf && Array.isArray(req.body.workspaces)) {
       workspaces = req.body.workspaces.filter((w) => ['india', 'us'].includes(w));
     }
 
@@ -87,11 +90,11 @@ router.patch('/:id', requireAdmin, async (req, res, next) => {
       password_hash = await bcrypt.hash(req.body.password, 12);
     }
 
-    db.prepare('UPDATE users SET username = ?, password_hash = ?, is_active = ?, is_admin = ?, workspaces = ?, accounts_access = ? WHERE id = ?')
-      .run(username, password_hash, is_active, is_admin, JSON.stringify(workspaces), accounts_access, user.id);
+    db.prepare('UPDATE users SET username = ?, password_hash = ?, is_active = ?, is_admin = ?, workspaces = ?, accounts_access = ?, hospital_access = ? WHERE id = ?')
+      .run(username, password_hash, is_active, is_admin, JSON.stringify(workspaces), accounts_access, hospital_access, user.id);
 
-    const updated = db.prepare('SELECT id, username, is_admin, is_active, workspaces, accounts_access, created_at FROM users WHERE id = ?').get(user.id);
-    res.json({ data: { ...updated, workspaces: parseWorkspaces(updated.workspaces), accounts_access: !!updated.accounts_access } });
+    const updated = db.prepare('SELECT id, username, is_admin, is_active, workspaces, accounts_access, hospital_access, created_at FROM users WHERE id = ?').get(user.id);
+    res.json({ data: { ...updated, workspaces: parseWorkspaces(updated.workspaces), accounts_access: !!updated.accounts_access, hospital_access: !!updated.hospital_access } });
   } catch (err) {
     next(err);
   }
@@ -103,6 +106,7 @@ router.delete('/:id', requireAdmin, (req, res, next) => {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.id === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account' });
+    if (user.username === 'admin') return res.status(400).json({ error: 'The admin account cannot be deleted' });
 
     db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
     res.status(204).send();

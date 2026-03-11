@@ -87,6 +87,106 @@ function runMigrations(db) {
   try { db.exec("ALTER TABLE accounts ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN last_paid_date TEXT DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'debit' CHECK(type IN ('debit','credit'))"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN hospital_access INTEGER NOT NULL DEFAULT 0"); } catch {}
+
+  // Hospital expenses (always USD)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS hospital_expenses (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount      REAL NOT NULL CHECK (amount > 0),
+      date        TEXT NOT NULL,
+      description TEXT NOT NULL,
+      hospital    TEXT DEFAULT NULL,
+      notes       TEXT DEFAULT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TRIGGER IF NOT EXISTS hospital_expenses_updated_at
+      AFTER UPDATE ON hospital_expenses FOR EACH ROW
+      BEGIN UPDATE hospital_expenses SET updated_at = datetime('now') WHERE id = OLD.id; END;
+    CREATE INDEX IF NOT EXISTS idx_hospital_expenses_user ON hospital_expenses(user_id);
+    CREATE INDEX IF NOT EXISTS idx_hospital_expenses_date ON hospital_expenses(date);
+  `);
+
+  // Make hospital_expenses.amount nullable (idempotent: try inserting NULL; if it fails the constraint exists and we recreate)
+  try {
+    const testRow = db.prepare("INSERT INTO hospital_expenses (user_id, amount, date, description) VALUES (0, NULL, '1970-01-01', '__test__')").run();
+    db.prepare('DELETE FROM hospital_expenses WHERE id = ?').run(testRow.lastInsertRowid);
+  } catch {
+    db.exec(`
+      CREATE TABLE hospital_expenses_v2 (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount      REAL DEFAULT NULL,
+        date        TEXT NOT NULL,
+        description TEXT NOT NULL,
+        hospital    TEXT DEFAULT NULL,
+        notes       TEXT DEFAULT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO hospital_expenses_v2 SELECT * FROM hospital_expenses;
+      DROP TABLE hospital_expenses;
+      ALTER TABLE hospital_expenses_v2 RENAME TO hospital_expenses;
+      CREATE TRIGGER IF NOT EXISTS hospital_expenses_updated_at
+        AFTER UPDATE ON hospital_expenses FOR EACH ROW
+        BEGIN UPDATE hospital_expenses SET updated_at = datetime('now') WHERE id = OLD.id; END;
+      CREATE INDEX IF NOT EXISTS idx_hospital_expenses_user ON hospital_expenses(user_id);
+      CREATE INDEX IF NOT EXISTS idx_hospital_expenses_date ON hospital_expenses(date);
+    `);
+  }
+
+  // Salary entries (per-user, always USD, no date)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS salary_entries (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      amount      REAL DEFAULT NULL,
+      notes       TEXT DEFAULT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TRIGGER IF NOT EXISTS salary_entries_updated_at
+      AFTER UPDATE ON salary_entries FOR EACH ROW
+      BEGIN UPDATE salary_entries SET updated_at = datetime('now') WHERE id = OLD.id; END;
+    CREATE INDEX IF NOT EXISTS idx_salary_entries_user ON salary_entries(user_id);
+  `);
+
+  // Salary settings (monthly salary per user)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS salary_settings (
+      user_id        INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      monthly_amount REAL NOT NULL DEFAULT 0
+    );
+  `);
+
+  // Remove date column from salary_entries if it exists (idempotent)
+  try {
+    db.prepare("INSERT INTO salary_entries (user_id, description) VALUES (0, '__test__')").run();
+    db.prepare("DELETE FROM salary_entries WHERE description = '__test__'").run();
+  } catch {
+    db.exec(`
+      CREATE TABLE salary_entries_v2 (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        description TEXT NOT NULL,
+        amount      REAL DEFAULT NULL,
+        notes       TEXT DEFAULT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO salary_entries_v2 (id, user_id, description, amount, notes, created_at, updated_at)
+        SELECT id, user_id, description, amount, notes, created_at, updated_at FROM salary_entries;
+      DROP TABLE salary_entries;
+      ALTER TABLE salary_entries_v2 RENAME TO salary_entries;
+      CREATE TRIGGER IF NOT EXISTS salary_entries_updated_at
+        AFTER UPDATE ON salary_entries FOR EACH ROW
+        BEGIN UPDATE salary_entries SET updated_at = datetime('now') WHERE id = OLD.id; END;
+      CREATE INDEX IF NOT EXISTS idx_salary_entries_user ON salary_entries(user_id);
+    `);
+  }
 
   // Account payments
   db.exec(`

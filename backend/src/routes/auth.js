@@ -33,8 +33,9 @@ router.post('/login', async (req, res, next) => {
 
     let workspaces = ['india', 'us'];
     try { workspaces = JSON.parse(user.workspaces ?? '["india","us"]'); } catch {}
-    const accounts_access = user.is_admin ? true : !!user.accounts_access;
-    res.json({ token, user: { id: user.id, username: user.username, is_admin: user.is_admin, workspaces, accounts_access } });
+    const accounts_access  = user.is_admin ? true : !!user.accounts_access;
+    const hospital_access  = user.is_admin ? true : !!user.hospital_access;
+    res.json({ token, user: { id: user.id, username: user.username, is_admin: user.is_admin, workspaces, accounts_access, hospital_access } });
   } catch (err) {
     next(err);
   }
@@ -47,12 +48,13 @@ router.post('/logout', (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT id, username, is_admin, is_active, workspaces, accounts_access, created_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, username, is_admin, is_active, workspaces, accounts_access, hospital_access, created_at FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(401).json({ error: 'User not found' });
   let workspaces = ['india', 'us'];
   try { workspaces = JSON.parse(user.workspaces ?? '["india","us"]'); } catch {}
   const accounts_access = user.is_admin ? true : !!user.accounts_access;
-  res.json({ user: { ...user, workspaces, accounts_access } });
+  const hospital_access = user.is_admin ? true : !!user.hospital_access;
+  res.json({ user: { ...user, workspaces, accounts_access, hospital_access } });
 });
 
 // PATCH /api/auth/password

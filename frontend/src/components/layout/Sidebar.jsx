@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, X } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -19,6 +19,7 @@ export default function Sidebar({ onClose }) {
   const { user } = useAuth();
   const { workspace } = useWorkspace();
   const links = allLinks.filter(l => !(l.indiaHide && workspace === 'india'));
+  const showHospital = user?.is_admin || user?.hospital_access;
 
   const linkClass = ({ isActive }) =>
     clsx(
@@ -53,6 +54,20 @@ export default function Sidebar({ onClose }) {
             {label}
           </NavLink>
         ))}
+
+        {showHospital && workspace !== 'india' && (
+          <NavLink to="/hospital" className={linkClass} onClick={onClose}>
+            <HeartPulse size={16} />
+            Hospital
+          </NavLink>
+        )}
+
+        {workspace !== 'india' && (
+          <NavLink to="/salary" className={linkClass} onClick={onClose}>
+            <Wallet size={16} />
+            Salary
+          </NavLink>
+        )}
 
         {!!user?.is_admin && (
           <>
