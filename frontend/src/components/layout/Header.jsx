@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, KeyRound, ChevronDown, Receipt, Sun, Moon, ArrowLeftRight } from 'lucide-react';
+import { Menu, LogOut, KeyRound, ChevronDown, Receipt, Sun, Moon, ArrowLeftRight, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import ChangePasswordModal from '../auth/ChangePasswordModal';
+import TwoFactorModal from '../auth/TwoFactorModal';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
@@ -12,6 +13,7 @@ export default function Header({ onMenuClick }) {
   const { config, clearWorkspace } = useWorkspace();
   const navigate = useNavigate();
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [show2FA, setShow2FA] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   const initial = user?.username?.[0]?.toUpperCase() ?? '?';
@@ -95,6 +97,15 @@ export default function Header({ onMenuClick }) {
                       <KeyRound size={15} className="text-gray-400 shrink-0" />
                       Change password
                     </button>
+                    <button
+                      onClick={() => { setShow2FA(true); setShowMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                    >
+                      {user?.totp_enabled
+                        ? <ShieldOff size={15} className="text-red-400 shrink-0" />
+                        : <ShieldCheck size={15} className="text-emerald-500 shrink-0" />}
+                      {user?.totp_enabled ? 'Disable 2FA' : 'Enable 2FA'}
+                    </button>
                     <div className="mx-3 border-t border-gray-100 dark:border-gray-700 my-1" />
                     <button
                       onClick={() => { setShowMenu(false); logout(); }}
@@ -112,6 +123,7 @@ export default function Header({ onMenuClick }) {
       </header>
 
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      {show2FA && <TwoFactorModal onClose={() => setShow2FA(false)} />}
     </>
   );
 }

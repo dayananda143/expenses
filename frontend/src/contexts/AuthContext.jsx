@@ -18,8 +18,23 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (username, password) => {
-    const { token, user } = await client.post('/auth/login', { username, password });
-    localStorage.setItem('expenses_token', token);
+    const data = await client.post('/auth/login', { username, password });
+    if (data.require_2fa) {
+      // Throw so LoginPage can handle the 2FA step
+      throw { require_2fa: true, temp_token: data.temp_token };
+    }
+    localStorage.setItem('expenses_token', data.token);
+    setUser(data.user);
+  }, []);
+
+  const loginWith2fa = useCallback(async (temp_token, code) => {
+    const data = await client.post('/auth/2fa/login', { temp_token, code });
+    localStorage.setItem('expenses_token', data.token);
+    setUser(data.user);
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const { user } = await client.get('/auth/me');
     setUser(user);
   }, []);
 
@@ -29,7 +44,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWith2fa, refreshUser, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

@@ -155,18 +155,71 @@ router.get('/:id', (req, res, next) => {
   }
 });
 
+// POST /api/expenses/apply-recurring?workspace=india
+router.post('/apply-recurring', (req, res, next) => {
+  try {
+    const { month, year } = req.body;
+    if (!month || !year) return res.status(400).json({ error: 'month and year are required' });
+    const m = parseInt(month);
+    const y = parseInt(year);
+    const monthPad = String(m).padStart(2, '0');
+    const monthStart = `${y}-${monthPad}-01`;
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    const monthEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+
+    // Find all recurring templates for this user+workspace
+    const templates = db.prepare(
+      'SELECT * FROM expenses WHERE user_id = ? AND workspace = ? AND is_recurring = 1'
+    ).all(req.user.id, req.workspace);
+
+    if (templates.length === 0) return res.json({ created: 0, skipped: 0 });
+
+    // Find which are already in target month (by description+category_id to avoid dupes)
+    const existing = db.prepare(
+      'SELECT description, category_id FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
+    ).all(req.user.id, req.workspace, monthStart, monthEnd);
+    const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}`));
+
+    const insert = db.prepare(
+      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)'
+    );
+
+    let created = 0;
+    let skipped = 0;
+    const insertMany = db.transaction(() => {
+      for (const t of templates) {
+        const key = `${t.description}|${t.category_id}`;
+        if (existingSet.has(key)) { skipped++; continue; }
+        // Use same day-of-month from original, capped to last day of target month
+        const origDay = parseInt(t.date.split('-')[2]);
+        const lastDay = new Date(y, m, 0).getDate();
+        const day = Math.min(origDay, lastDay);
+        const dateStr = `${y}-${monthPad}-${String(day).padStart(2, '0')}`;
+        insert.run(t.user_id, t.category_id, t.amount, dateStr, t.description, t.notes, t.workspace, t.type);
+        created++;
+      }
+    });
+    insertMany();
+
+    res.json({ created, skipped });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/expenses?workspace=india
 router.post('/', (req, res, next) => {
   try {
-    const { category_id, amount, date, description, notes, type } = req.body;
+    const { category_id, amount, date, description, notes, type, is_recurring } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const txType = type === 'credit' ? 'credit' : 'debit';
 
     const result = db.prepare(
-      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(req.user.id, category_id ?? null, parseFloat(amount), date, description.trim(), notes ?? null, req.workspace, txType);
+      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(req.user.id, category_id ?? null, parseFloat(amount), date, description.trim(), notes ?? null, req.workspace, txType, is_recurring ? 1 : 0);
 
     const row = db.prepare(`
       SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
@@ -186,15 +239,15 @@ router.put('/:id', (req, res, next) => {
     ).get(req.params.id, req.workspace, req.user.id, req.user.is_admin ? 1 : 0);
     if (!existing) return res.status(404).json({ error: 'Expense not found' });
 
-    const { category_id, amount, date, description, notes, type } = req.body;
+    const { category_id, amount, date, description, notes, type, is_recurring } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const txType = type === 'credit' ? 'credit' : 'debit';
 
     db.prepare(
-      'UPDATE expenses SET category_id=?, amount=?, date=?, description=?, notes=?, type=? WHERE id=?'
-    ).run(category_id ?? null, parseFloat(amount), date, description.trim(), notes ?? null, txType, existing.id);
+      'UPDATE expenses SET category_id=?, amount=?, date=?, description=?, notes=?, type=?, is_recurring=? WHERE id=?'
+    ).run(category_id ?? null, parseFloat(amount), date, description.trim(), notes ?? null, txType, is_recurring ? 1 : 0, existing.id);
 
     const row = db.prepare(`
       SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon

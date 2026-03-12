@@ -47,6 +47,18 @@ export function useDeleteExpense() {
   });
 }
 
+export function useApplyRecurring() {
+  const qc = useQueryClient();
+  const { workspace } = useWorkspace();
+  return useMutation({
+    mutationFn: ({ month, year }) => client.post('/expenses/apply-recurring', { month, year }, { params: { workspace } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses', workspace] });
+      qc.invalidateQueries({ queryKey: ['dashboard', workspace] });
+    },
+  });
+}
+
 export function useImportExpenses() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();

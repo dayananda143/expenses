@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine } from 'recharts';
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download } from 'lucide-react';
 import client from '../api/client';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
@@ -67,11 +68,25 @@ function MonthNav({ year, month, onChange }) {
 export default function DashboardPage() {
   const { dark } = useTheme();
   const { workspace, fmtRound } = useWorkspace();
+  const navigate = useNavigate();
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
 
   function handleMonthChange(y, m) { setYear(y); setMonth(m); }
+
+  function handleExportCsv() {
+    const token = localStorage.getItem('token');
+    const url = `/api/expenses/export/csv?workspace=${workspace}&month=${month}&year=${year}`;
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.blob())
+      .then((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `expenses-${workspace}-${MONTH_NAMES[month - 1]}-${year}.csv`;
+        a.click();
+      });
+  }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard', workspace, year, month],
@@ -91,7 +106,16 @@ export default function DashboardPage() {
       {/* Header row */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <MonthNav year={year} month={month} onChange={handleMonthChange} />
+        <div className="flex items-center gap-2">
+          <MonthNav year={year} month={month} onChange={handleMonthChange} />
+          <button
+            onClick={handleExportCsv}
+            title={`Export ${MONTH_NAMES[month - 1]} ${year} to CSV`}
+            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <Download size={16} />
+          </button>
+        </div>
       </div>
 
       {isLoading && <LoadingSpinner />}
@@ -138,7 +162,15 @@ export default function DashboardPage() {
               {/* Recent transactions */}
               {recent.length > 0 && (
                 <div className={card}>
-                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Recent in {MONTH_NAMES[month - 1]}</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Recent in {MONTH_NAMES[month - 1]}</h2>
+                    <button
+                      onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                    >
+                      View all
+                    </button>
+                  </div>
                   <div className="space-y-2">
                     {recent.map((e) => (
                       <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
@@ -176,6 +208,16 @@ export default function DashboardPage() {
           total: m.total,
         }));
 
+        // Month-over-month helpers
+        const prevMonth = month === 1 ? 12 : month - 1;
+        const prevYear  = month === 1 ? year - 1 : year;
+        const vsPrev = data.prevMonthTotal > 0
+          ? Math.round(((data.monthTotal - data.prevMonthTotal) / data.prevMonthTotal) * 100)
+          : null;
+        const vsLastYear = data.sameMonthLastYearTotal > 0
+          ? Math.round(((data.monthTotal - data.sameMonthLastYearTotal) / data.sameMonthLastYearTotal) * 100)
+          : null;
+
         return (
           <>
             {/* Summary cards */}
@@ -188,6 +230,20 @@ export default function DashboardPage() {
                   <TrendingDown size={18} className="text-emerald-600" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmtRound(monthTotal)}</p>
+                <div className="flex items-center gap-3 mt-1.5">
+                  {vsPrev !== null && (
+                    <span className={`text-xs font-medium flex items-center gap-0.5 ${vsPrev > 0 ? 'text-red-500' : vsPrev < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                      {vsPrev > 0 ? <TrendingUp size={11} /> : vsPrev < 0 ? <TrendingDown size={11} /> : null}
+                      {vsPrev > 0 ? '+' : ''}{vsPrev}% vs {MONTH_NAMES[prevMonth - 1]}
+                    </span>
+                  )}
+                  {vsLastYear !== null && (
+                    <span className={`text-xs font-medium flex items-center gap-0.5 ${vsLastYear > 0 ? 'text-red-500' : vsLastYear < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                      {vsLastYear > 0 ? <TrendingUp size={11} /> : vsLastYear < 0 ? <TrendingDown size={11} /> : null}
+                      {vsLastYear > 0 ? '+' : ''}{vsLastYear}% vs {MONTH_NAMES[month - 1]} {prevYear}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className={card}>
                 <div className="flex items-center justify-between mb-1">
@@ -195,38 +251,36 @@ export default function DashboardPage() {
                   <TrendingUp size={18} className="text-blue-500" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmtRound(yearTotal)}</p>
+                {data.monthTotal > 0 && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
+                    Avg {fmtRound(Math.round(yearTotal / month))} / month this year
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Budget Status */}
-            {budgetStatus.length > 0 && (
+            {/* Spending insights */}
+            {data.insights?.length > 0 && (
               <div className={card}>
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Budget Status</h2>
-                <div className="space-y-4">
-                  {budgetStatus.map((b) => {
-                    const pct = Math.min((b.spent / b.amount) * 100, 100);
-                    const over = b.spent > b.amount;
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Spending Insights</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {data.insights.map((ins) => {
+                    const up = ins.changePercent > 0;
                     return (
-                      <div key={b.id}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            {over
-                              ? <AlertTriangle size={14} className="text-red-500" />
-                              : <CheckCircle size={14} className="text-emerald-500" />
-                            }
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              {b.category_name ?? 'Overall'} ({b.period})
-                            </span>
-                          </div>
-                          <span className={`text-xs font-semibold ${over ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {fmtRound(b.spent)} / {fmtRound(b.amount)}
-                          </span>
+                      <div
+                        key={ins.id}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors"
+                        onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${ins.id}`)}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ins.color }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{ins.name}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{fmtRound(ins.thisMonth)} this month</p>
                         </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all ${over ? 'bg-red-500' : 'bg-emerald-500'}`}
-                            style={{ width: `${pct}%` }}
-                          />
+                        <div className={`text-xs font-semibold flex items-center gap-0.5 shrink-0 ${up ? 'text-red-500' : 'text-emerald-600'}`}>
+                          {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          {up ? '+' : ''}{ins.changePercent}%
+                          <span className="text-gray-400 font-normal ml-0.5">vs 3-mo avg</span>
                         </div>
                       </div>
                     );
@@ -235,11 +289,90 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* Budget Status */}
+            {budgetStatus.length > 0 && (() => {
+              const now2 = new Date();
+              const isCurrentMonth = year === now2.getFullYear() && month === now2.getMonth() + 1;
+              const dayOfMonth = isCurrentMonth ? now2.getDate() : new Date(year, month, 0).getDate();
+              const daysInMonth = new Date(year, month, 0).getDate();
+
+              return (
+                <div className={card}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Budget Status</h2>
+                    <button
+                      onClick={() => navigate('/budgets')}
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                    >
+                      Manage budgets
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {budgetStatus.map((b) => {
+                      const pct = Math.min((b.spent / b.amount) * 100, 100);
+                      const over = b.spent > b.amount;
+
+                      // Forecasting (monthly budgets only, when not already over)
+                      let forecastMsg = null;
+                      if (b.period === 'monthly' && !over && dayOfMonth > 0 && b.spent > 0) {
+                        const dailyRate = b.spent / dayOfMonth;
+                        const projected = dailyRate * daysInMonth;
+                        if (projected > b.amount) {
+                          const daysToExceed = Math.floor((b.amount - b.spent) / dailyRate);
+                          const exceedDate = new Date(year, month - 1, dayOfMonth + daysToExceed);
+                          const exceedStr = exceedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          forecastMsg = { type: 'warn', text: `At this rate, exceeded by ${exceedStr}` };
+                        } else {
+                          const remaining = b.amount - b.spent;
+                          forecastMsg = { type: 'ok', text: `${fmtRound(remaining)} left · projected ${fmtRound(Math.round(projected))}` };
+                        }
+                      } else if (over) {
+                        forecastMsg = { type: 'over', text: `Over by ${fmtRound(b.spent - b.amount)}` };
+                      }
+
+                      return (
+                        <div key={b.id}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2">
+                              {over
+                                ? <AlertTriangle size={14} className="text-red-500" />
+                                : <CheckCircle size={14} className="text-emerald-500" />
+                              }
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {b.category_name ?? 'Overall'} ({b.period})
+                              </span>
+                            </div>
+                            <span className={`text-xs font-semibold ${over ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                              {fmtRound(b.spent)} / {fmtRound(b.amount)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all ${over ? 'bg-red-500' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          {forecastMsg && (
+                            <p className={`text-xs mt-1 ${forecastMsg.type === 'warn' ? 'text-amber-500 dark:text-amber-400' : forecastMsg.type === 'over' ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                              {forecastMsg.text}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Monthly trend */}
               {monthlyData.length > 0 && (
                 <div className={card}>
-                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Monthly Spending</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Monthly Spending</h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Click a bar to view expenses</span>
+                  </div>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={monthlyData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} />
@@ -249,7 +382,15 @@ export default function DashboardPage() {
                         contentStyle={tooltipStyle}
                         cursor={{ fill: dark ? '#374151' : '#f3f4f6' }}
                       />
-                      <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                      <Bar
+                        dataKey="total"
+                        radius={[4, 4, 0, 0]}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(data) => {
+                          const [y, m] = data.monthKey.split('-').map(Number);
+                          navigate(`/expenses?month=${m}&year=${y}`);
+                        }}
+                      >
                         {monthlyData.map((entry) => (
                           <Cell
                             key={entry.monthKey}
@@ -266,14 +407,29 @@ export default function DashboardPage() {
               {/* By category */}
               {catData.length > 0 && (
                 <div className={card}>
-                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                    {MONTH_NAMES[month - 1]} by Category
-                  </h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      {MONTH_NAMES[month - 1]} by Category
+                    </h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Click a slice to filter</span>
+                  </div>
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
-                      <Pie data={catData} dataKey="total" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
+                      <Pie
+                        data={catData}
+                        dataKey="total"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                      >
                         {catData.map((entry) => (
-                          <Cell key={entry.id} fill={entry.color} />
+                          <Cell
+                            key={entry.id}
+                            fill={entry.color}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                          />
                         ))}
                       </Pie>
                       <Tooltip formatter={(v) => fmtRound(v)} contentStyle={tooltipStyle} />
@@ -287,9 +443,17 @@ export default function DashboardPage() {
             {/* Recent expenses */}
             {recent.length > 0 && (
               <div className={card}>
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                  Recent in {MONTH_NAMES[month - 1]}
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Recent in {MONTH_NAMES[month - 1]}
+                  </h2>
+                  <button
+                    onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}
+                    className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                  >
+                    View all
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {recent.map((e) => (
                     <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">

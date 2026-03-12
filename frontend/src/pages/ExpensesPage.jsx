@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange } from 'lucide-react';
 import Papa from 'papaparse';
-import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses } from '../hooks/useExpenses';
+import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring } from '../hooks/useExpenses';
 import { useCategories } from '../hooks/useCategories';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
@@ -64,13 +65,13 @@ function ExpenseModal({ expense, categories, onClose }) {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     defaultValues: expense
-      ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', notes: expense.notes ?? '' }
-      : { date: new Date().toLocaleDateString('en-CA') },
+      ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', notes: expense.notes ?? '', is_recurring: !!expense.is_recurring }
+      : { date: new Date().toLocaleDateString('en-CA'), is_recurring: false },
   });
 
   async function onSubmit(data) {
     try {
-      const payload = { ...data, amount: parseFloat(data.amount), category_id: data.category_id || null };
+      const payload = { ...data, amount: parseFloat(data.amount), category_id: data.category_id || null, is_recurring: data.is_recurring ? 1 : 0 };
       if (isEdit) { await update.mutateAsync({ id: expense.id, ...payload }); toast('Expense updated'); }
       else        { await create.mutateAsync(payload); toast('Expense added'); }
       onClose(data.date);
@@ -113,6 +114,13 @@ function ExpenseModal({ expense, categories, onClose }) {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
               <textarea {...register('notes')} rows={2} className={`${inputCls} resize-none`} />
             </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" {...register('is_recurring')} className="w-4 h-4 rounded accent-emerald-600" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Repeat monthly</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">(use as a recurring template)</span>
+              </label>
+            </div>
           </div>
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={() => onClose()} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
@@ -130,26 +138,43 @@ export default function ExpensesPage() {
   const { toast } = useToast();
   const { workspace, fmt } = useWorkspace();
   const now = new Date();
+  const [searchParams] = useSearchParams();
+
+  const initialMonth = useMemo(() => {
+    const m = parseInt(searchParams.get('month'), 10);
+    return m >= 1 && m <= 12 ? m : now.getMonth() + 1;
+  }, []);
+  const initialYear = useMemo(() => {
+    const y = parseInt(searchParams.get('year'), 10);
+    return y > 2000 ? y : now.getFullYear();
+  }, []);
+  const initialCategoryId = useMemo(() => searchParams.get('category_id') ?? '', []);
 
   const [showModal, setShowModal] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
-  const [filterYear, setFilterYear] = useState(now.getFullYear());
-  const [filters, setFilters] = useState({ category_id: '', search: '' });
+  const [filterMode, setFilterMode] = useState('month'); // 'month' | 'range'
+  const [filterMonth, setFilterMonth] = useState(initialMonth);
+  const [filterYear, setFilterYear] = useState(initialYear);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [filters, setFilters] = useState({ category_id: initialCategoryId, search: '' });
   const [sort, setSort] = useState('date');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const fileRef = useRef(null);
+  const applyRecurring = useApplyRecurring();
 
   const { data: catData } = useCategories();
   const categories = catData?.data ?? [];
 
-  // Build params — use month/year filter OR date_from/date_to
+  // Build params — month mode OR date range mode
   const params = {
     page, limit, sort, order,
-    ...(filterMonth !== null ? { month: filterMonth, year: filterYear } : {}),
+    ...(filterMode === 'month' && filterMonth !== null ? { month: filterMonth, year: filterYear } : {}),
+    ...(filterMode === 'range' && dateFrom ? { date_from: dateFrom } : {}),
+    ...(filterMode === 'range' && dateTo   ? { date_to:   dateTo   } : {}),
     ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
   };
   const { data, isLoading, error } = useExpenses(params);
@@ -173,6 +198,16 @@ export default function ExpensesPage() {
 
   function handleMonthChange(m, y) { setFilterMonth(m); setFilterYear(y); setPage(1); }
   function clearMonthFilter() { setFilterMonth(null); setPage(1); }
+
+  async function handleApplyRecurring() {
+    const m = filterMode === 'month' && filterMonth ? filterMonth : now.getMonth() + 1;
+    const y = filterMode === 'month' && filterMonth ? filterYear : now.getFullYear();
+    try {
+      const result = await applyRecurring.mutateAsync({ month: m, year: y });
+      if (result.created === 0 && result.skipped > 0) toast(`All ${result.skipped} recurring expense(s) already exist for this month`);
+      else toast(`Added ${result.created} recurring expense(s)${result.skipped ? ` (${result.skipped} already existed)` : ''}`);
+    } catch (err) { toast(err?.error ?? 'Failed to apply recurring expenses', 'error'); }
+  }
 
   async function handleDelete() {
     try { await deleteExp.mutateAsync(deleteTarget.id); toast('Expense deleted'); setDeleteTarget(null); }
@@ -259,7 +294,43 @@ export default function ExpensesPage() {
             <option value="">All Categories</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <MonthYearPicker month={filterMonth} year={filterYear} onChange={handleMonthChange} onClear={clearMonthFilter} />
+          <div className="flex items-center gap-2">
+            {/* Mode toggle */}
+            <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden text-xs font-medium shrink-0">
+              <button
+                onClick={() => { setFilterMode('month'); setPage(1); }}
+                className={`px-2.5 py-1.5 transition-colors ${filterMode === 'month' ? 'bg-emerald-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                title="Filter by month"
+              >Month</button>
+              <button
+                onClick={() => { setFilterMode('range'); setPage(1); }}
+                className={`px-2.5 py-1.5 transition-colors flex items-center gap-1 ${filterMode === 'range' ? 'bg-emerald-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                title="Filter by date range"
+              ><CalendarRange size={12} /> Range</button>
+            </div>
+            {filterMode === 'month'
+              ? <MonthYearPicker month={filterMonth} year={filterYear} onChange={handleMonthChange} onClear={clearMonthFilter} />
+              : <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className={`${inputCls} text-xs py-1.5`} />
+                  <span className="text-gray-400 text-xs shrink-0">to</span>
+                  <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className={`${inputCls} text-xs py-1.5`} />
+                </div>
+            }
+          </div>
+        </div>
+        {/* Recurring apply banner */}
+        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
+          <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+            <RefreshCw size={12} /> Mark expenses as "Repeat monthly" to use as recurring templates
+          </p>
+          <button
+            onClick={handleApplyRecurring}
+            disabled={applyRecurring.isPending}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors font-medium disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={applyRecurring.isPending ? 'animate-spin' : ''} />
+            Apply recurring
+          </button>
         </div>
       </div>
 
@@ -269,7 +340,22 @@ export default function ExpensesPage() {
       {!isLoading && !error && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           {expenses.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 dark:text-gray-500 text-sm">No expenses found.</div>
+            <div className="py-16 text-center">
+              <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+                <Search size={20} className="text-gray-300 dark:text-gray-600" />
+              </div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">No expenses found</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+                {filterMode === 'month' && filterMonth !== null
+                  ? `Nothing recorded for ${MONTHS[filterMonth - 1]} ${filterYear}`
+                  : filters.search || filters.category_id
+                  ? 'Try adjusting your filters'
+                  : 'Add your first expense to get started'}
+              </p>
+              <button onClick={openAdd} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+                <Plus size={14} /> Add expense
+              </button>
+            </div>
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -294,7 +380,14 @@ export default function ExpensesPage() {
                       <tr key={e.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{e.date}</td>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-800 dark:text-gray-200">{e.description}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-800 dark:text-gray-200">{e.description}</p>
+                            {!!e.is_recurring && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" title="Recurring template">
+                                <RefreshCw size={10} /> recurring
+                              </span>
+                            )}
+                          </div>
                           {e.notes && <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">{e.notes}</p>}
                         </td>
                         <td className="px-4 py-3">

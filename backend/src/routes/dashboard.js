@@ -68,6 +68,42 @@ router.get('/', (req, res, next) => {
       ORDER BY month ASC
     `).all(userId, ws, monthStart, monthStart);
 
+    // Previous month total (for month-over-month comparison)
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear  = month === 1 ? year - 1 : year;
+    const prevMonthStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+    const prevMonthTotal = db.prepare(
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
+    ).get(userId, ws, prevMonthStart, monthStart).total;
+
+    // Same month last year total
+    const lastYearNextMonth = month === 12 ? 1 : month + 1;
+    const lastYearNextYear  = month === 12 ? year : year - 1;
+    const lastYearMonthStart = `${year - 1}-${monthPad}-01`;
+    const lastYearMonthEnd   = `${lastYearNextYear}-${String(lastYearNextMonth).padStart(2, '0')}-01`;
+    const sameMonthLastYearTotal = db.prepare(
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
+    ).get(userId, ws, lastYearMonthStart, lastYearMonthEnd).total;
+
+    // Spending insights: each category this month vs 3-month average
+    const threeMonthsAgoDate = new Date(year, month - 1 - 3, 1);
+    const threeMonthsAgoStr  = `${threeMonthsAgoDate.getFullYear()}-${String(threeMonthsAgoDate.getMonth() + 1).padStart(2, '0')}-01`;
+    const insights = byCategory
+      .filter((c) => c.total > 0)
+      .map((c) => {
+        const { avg } = db.prepare(`
+          SELECT COALESCE(SUM(amount), 0) / 3.0 AS avg FROM expenses
+          WHERE user_id = ? AND workspace = ? AND category_id = ? AND date >= ? AND date < ?
+        `).get(userId, ws, c.id, threeMonthsAgoStr, monthStart);
+        if (avg === 0) return null;
+        const changePercent = Math.round(((c.total - avg) / avg) * 100);
+        if (Math.abs(changePercent) < 5) return null; // skip negligible changes
+        return { id: c.id, name: c.name, color: c.color, thisMonth: c.total, avg3: avg, changePercent };
+      })
+      .filter(Boolean)
+      .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+      .slice(0, 4);
+
     // Recent expenses for selected month (last 5)
     const recent = db.prepare(`
       SELECT e.id, e.description, e.amount, e.date, e.type, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
@@ -110,6 +146,9 @@ router.get('/', (req, res, next) => {
       monthDebit,
       allTimeCredit,
       allTimeDebit,
+      prevMonthTotal,
+      sameMonthLastYearTotal,
+      insights,
     });
   } catch (err) {
     next(err);
