@@ -16,13 +16,15 @@ router.use((req, res, next) => {
 // GET /api/account-payments?workspace=us
 router.get('/', (req, res, next) => {
   try {
+    // Non-admins see admin's payments
+    const targetId = req.user.is_admin ? req.user.id : db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get()?.id;
     const rows = db.prepare(`
       SELECT p.*, a.name AS account_name, a.type AS account_type
       FROM account_payments p
       JOIN accounts a ON a.id = p.account_id
       WHERE p.user_id = ? AND p.workspace = ?
       ORDER BY p.date DESC, p.created_at DESC
-    `).all(req.user.id, req.workspace);
+    `).all(targetId, req.workspace);
     res.json({ data: rows });
   } catch (err) {
     next(err);
@@ -31,6 +33,7 @@ router.get('/', (req, res, next) => {
 
 // POST /api/account-payments?workspace=us
 router.post('/', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { account_id, amount, date, notes } = req.body;
     if (!account_id) return res.status(400).json({ error: 'account_id is required' });
@@ -67,6 +70,7 @@ router.post('/', (req, res, next) => {
 
 // DELETE /api/account-payments/:id?workspace=us
 router.delete('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const payment = db.prepare('SELECT * FROM account_payments WHERE id = ? AND user_id = ? AND workspace = ?')
       .get(req.params.id, req.user.id, req.workspace);

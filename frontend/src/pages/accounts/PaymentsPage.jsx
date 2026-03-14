@@ -6,6 +6,7 @@ import { useAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment, useDeletePayment } from '../../hooks/useAccountPayments';
 import { WS, fmtUSDDecimal, fmtFullDate } from './shared';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
+import { useAuth } from '../../contexts/AuthContext';
 
 const inputCls = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors';
 const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide';
@@ -27,6 +28,8 @@ function buildPages(cur, total) {
 }
 
 export default function PaymentsPage() {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const location = useLocation();
   const preselectedId = location.state?.preselectedId ?? '';
 
@@ -94,8 +97,8 @@ export default function PaymentsPage() {
         <p className="text-sm text-gray-400 mt-0.5">Record payments made toward credit cards</p>
       </div>
 
-      {/* Record payment form */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+      {/* Record payment form — admin only */}
+      {isAdmin && <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
         <h2 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-4">Record a Payment</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
@@ -137,7 +140,7 @@ export default function PaymentsPage() {
             {isSubmitting ? 'Recording…' : 'Record Payment'}
           </button>
         </form>
-      </div>
+      </div>}
 
       {/* Payment history */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">

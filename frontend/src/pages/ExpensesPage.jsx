@@ -1,7 +1,15 @@
 import { useState, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, Tag } from 'lucide-react';
+
+const ICON_MAP = {
+  'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
+  'heart-pulse': HeartPulse, 'zap': Zap, 'home': Home, 'book-open': BookOpen,
+  'plane': Plane, 'circle': Circle, 'coffee': Coffee, 'music': Music,
+  'gamepad-2': Gamepad2, 'dumbbell': Dumbbell, 'baby': Baby, 'gift': Gift,
+  'paw-print': PawPrint, 'briefcase': Briefcase, 'smartphone': Smartphone, 'shirt': Shirt,
+};
 import Papa from 'papaparse';
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring } from '../hooks/useExpenses';
 import { useCategories } from '../hooks/useCategories';
@@ -10,6 +18,7 @@ import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -137,6 +146,8 @@ function ExpenseModal({ expense, categories, onClose }) {
 export default function ExpensesPage() {
   const { toast } = useToast();
   const { workspace, fmt } = useWorkspace();
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const now = new Date();
   const [searchParams] = useSearchParams();
 
@@ -162,7 +173,7 @@ export default function ExpensesPage() {
   const [sort, setSort] = useState('date');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
+  const [limit, setLimit] = useState(10);
   const fileRef = useRef(null);
   const applyRecurring = useApplyRecurring();
 
@@ -270,11 +281,13 @@ export default function ExpensesPage() {
             </div>
           </div>
           <button onClick={handleExport} className={btnOutline}><Download size={15} /><span className="hidden sm:inline">Export</span></button>
-          <button onClick={() => fileRef.current?.click()} className={btnOutline}><Upload size={15} /><span className="hidden sm:inline">Import</span></button>
-          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
-          <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-            <Plus size={15} /> Add
-          </button>
+          {isAdmin && <>
+            <button onClick={() => fileRef.current?.click()} className={btnOutline}><Upload size={15} /><span className="hidden sm:inline">Import</span></button>
+            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+            <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+              <Plus size={15} /> Add
+            </button>
+          </>}
         </div>
       </div>
 
@@ -318,8 +331,8 @@ export default function ExpensesPage() {
             }
           </div>
         </div>
-        {/* Recurring apply banner */}
-        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
+        {/* Recurring apply banner — admin only */}
+        {isAdmin && <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
           <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
             <RefreshCw size={12} /> Mark expenses as "Repeat monthly" to use as recurring templates
           </p>
@@ -331,7 +344,7 @@ export default function ExpensesPage() {
             <RefreshCw size={12} className={applyRecurring.isPending ? 'animate-spin' : ''} />
             Apply recurring
           </button>
-        </div>
+        </div>}
       </div>
 
       {isLoading && <LoadingSpinner />}
@@ -350,11 +363,13 @@ export default function ExpensesPage() {
                   ? `Nothing recorded for ${MONTHS[filterMonth - 1]} ${filterYear}`
                   : filters.search || filters.category_id
                   ? 'Try adjusting your filters'
-                  : 'Add your first expense to get started'}
+                  : isAdmin ? 'Add your first expense to get started' : 'No expenses recorded yet'}
               </p>
-              <button onClick={openAdd} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                <Plus size={14} /> Add expense
-              </button>
+              {isAdmin && (
+                <button onClick={openAdd} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+                  <Plus size={14} /> Add expense
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -372,7 +387,7 @@ export default function ExpensesPage() {
                       <th className={thCls('amount')} onClick={() => handleSort('amount')}>
                         <span className="flex items-center gap-1 justify-end">Amount <SortIcon field="amount" sort={sort} order={order} /></span>
                       </th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>
+                      {isAdmin && <th className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -393,7 +408,7 @@ export default function ExpensesPage() {
                         <td className="px-4 py-3">
                           {e.category_name ? (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: e.category_color + '22', color: e.category_color }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: e.category_color }} />
+                              {(() => { const I = ICON_MAP[e.category_icon]; return I ? <I size={11} /> : <Tag size={11} />; })()}
                               {e.category_name}
                             </span>
                           ) : (
@@ -401,19 +416,21 @@ export default function ExpensesPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{fmt(e.amount)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1">
-                            <button onClick={() => openCopy(e)} title="Duplicate" className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                              <Copy size={14} />
-                            </button>
-                            <button onClick={() => openEdit(e)} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
-                              <Pencil size={14} />
-                            </button>
-                            <button onClick={() => setDeleteTarget(e)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
+                        {isAdmin && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button onClick={() => openCopy(e)} title="Duplicate" className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                                <Copy size={14} />
+                              </button>
+                              <button onClick={() => openEdit(e)} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={() => setDeleteTarget(e)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

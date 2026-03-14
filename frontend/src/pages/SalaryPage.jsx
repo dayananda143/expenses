@@ -14,6 +14,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
@@ -159,6 +160,8 @@ function SalaryModal({ entry, onClose }) {
 
 export default function SalaryPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const [search, setSearch] = useState('');
   const [page, setPage]     = useState(1);
   const [sort, setSort]     = useState('');
@@ -205,12 +208,14 @@ export default function SalaryPage() {
           <Wallet size={20} className="text-emerald-500" />
           Salary
         </h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          <Plus size={15} /> Add Entry
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            <Plus size={15} /> Add Entry
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}

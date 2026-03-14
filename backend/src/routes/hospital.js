@@ -33,12 +33,12 @@ router.get('/', (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(limitQ) || 25, 1), 100);
     const offset = (parseInt(page) - 1) * limit;
 
-    // Admins see all; regular users see only their own
-    let where = req.user.is_admin ? '1=1' : 'h.user_id = ?';
-    const params = req.user.is_admin ? [] : [req.user.id];
+    // Everyone with hospital_access sees all records; admin can filter by user_id
+    let where = '1=1';
+    const params = [];
 
     if (req.user.is_admin && user_id) {
-      where += ' AND h.user_id = ?';
+      where = 'h.user_id = ?';
       params.push(user_id);
     }
 
@@ -75,6 +75,7 @@ router.get('/', (req, res, next) => {
 
 // POST /api/hospital-expenses
 router.post('/', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { description, amount, date, hospital, notes, assigned_to } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
@@ -105,11 +106,9 @@ router.post('/', (req, res, next) => {
 
 // PUT /api/hospital-expenses/:id
 router.put('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    // Admins can edit any record; others only their own
-    const row = req.user.is_admin
-      ? db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id)
-      : db.prepare('SELECT * FROM hospital_expenses WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
 
     const { description, amount, date, hospital, notes, assigned_to } = req.body;
@@ -140,10 +139,9 @@ router.put('/:id', (req, res, next) => {
 
 // DELETE /api/hospital-expenses/:id
 router.delete('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const row = req.user.is_admin
-      ? db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id)
-      : db.prepare('SELECT * FROM hospital_expenses WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     db.prepare('DELETE FROM hospital_expenses WHERE id = ?').run(row.id);
     res.status(204).send();
@@ -158,13 +156,9 @@ router.get('/summary', (req, res, next) => {
     const { year, user_id } = req.query;
     const yearParam = year ?? new Date().getFullYear().toString();
 
-    // Admins see totals for all (or filtered) users; others see own
-    const scopeWhere = req.user.is_admin
-      ? (user_id ? 'user_id = ?' : '1=1')
-      : 'user_id = ?';
-    const scopeParams = req.user.is_admin
-      ? (user_id ? [user_id] : [])
-      : [req.user.id];
+    // Everyone with hospital_access sees all records; admin can filter by user_id
+    const scopeWhere  = user_id && req.user.is_admin ? 'user_id = ?' : '1=1';
+    const scopeParams = user_id && req.user.is_admin ? [user_id] : [];
 
     const yearTotal = db.prepare(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM hospital_expenses WHERE ${scopeWhere} AND strftime('%Y', date) = ?`
@@ -179,6 +173,94 @@ router.get('/summary', (req, res, next) => {
     ).get(...scopeParams).total;
 
     res.json({ yearTotal, allTime, monthly, year: yearParam });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/hospital-expenses/export/csv
+router.get('/export/csv', (req, res, next) => {
+  try {
+    const { month, year, search, user_id } = req.query;
+
+    let where = '1=1';
+    const params = [];
+
+    if (req.user.is_admin && user_id) {
+      where = 'h.user_id = ?';
+      params.push(user_id);
+    }
+
+    if (month && year) {
+      where += ` AND strftime('%m', h.date) = ? AND strftime('%Y', h.date) = ?`;
+      params.push(String(month).padStart(2, '0'), String(year));
+    } else if (year) {
+      where += ` AND strftime('%Y', h.date) = ?`;
+      params.push(String(year));
+    }
+
+    if (search) {
+      where += ' AND (h.description LIKE ? OR h.hospital LIKE ? OR h.notes LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s);
+    }
+
+    const rows = db.prepare(
+      `SELECT h.*, u.username FROM hospital_expenses h LEFT JOIN users u ON u.id = h.user_id WHERE ${where} ORDER BY h.date DESC`
+    ).all(...params);
+
+    const lines = [
+      'date,description,amount,hospital,notes,assigned_to',
+      ...rows.map((r) => [
+        r.date,
+        `"${(r.description ?? '').replace(/"/g, '""')}"`,
+        r.amount ?? '',
+        `"${(r.hospital ?? '').replace(/"/g, '""')}"`,
+        `"${(r.notes ?? '').replace(/"/g, '""')}"`,
+        `"${(r.username ?? '').replace(/"/g, '""')}"`,
+      ].join(',')),
+    ];
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="hospital-expenses-${date}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/hospital-expenses/import/csv
+router.post('/import/csv', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'rows array is required' });
+    }
+
+    const insert = db.prepare(
+      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+
+    let imported = 0;
+    const errors = [];
+    for (const [i, row] of rows.entries()) {
+      const { date, description, amount, hospital, notes } = row;
+      if (!date || !description) {
+        errors.push(`Row ${i + 1}: date and description are required`);
+        continue;
+      }
+      const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
+      if (parsedAmount !== null && isNaN(parsedAmount)) {
+        errors.push(`Row ${i + 1}: invalid amount`);
+        continue;
+      }
+      insert.run(req.user.id, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null);
+      imported++;
+    }
+
+    res.json({ imported, errors });
   } catch (err) {
     next(err);
   }

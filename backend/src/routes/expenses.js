@@ -10,12 +10,12 @@ function buildWhere(query, workspace, userId, isAdmin) {
   const where = ['e.workspace = ?'];
   const params = [workspace];
 
+  // Everyone sees admin-entered expenses; admin can further filter by a specific user_id
   if (isAdmin && user_id && user_id !== 'all') {
     where.push('e.user_id = ?');
     params.push(parseInt(user_id));
-  } else if (!isAdmin) {
-    where.push('e.user_id = ?');
-    params.push(userId);
+  } else {
+    where.push('e.user_id IN (SELECT id FROM users WHERE is_admin = 1)');
   }
 
   if (category_id && category_id !== 'all') {
@@ -110,6 +110,7 @@ router.get('/export/csv', (req, res, next) => {
 
 // POST /api/expenses/import/csv?workspace=india
 router.post('/import/csv', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { rows } = req.body;
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -146,8 +147,9 @@ router.get('/:id', (req, res, next) => {
     const row = db.prepare(`
       SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
       FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
-      WHERE e.id = ? AND e.workspace = ? AND (e.user_id = ? OR ?)
-    `).get(req.params.id, req.workspace, req.user.id, req.user.is_admin ? 1 : 0);
+      WHERE e.id = ? AND e.workspace = ?
+        AND e.user_id IN (SELECT id FROM users WHERE is_admin = 1)
+    `).get(req.params.id, req.workspace);
     if (!row) return res.status(404).json({ error: 'Expense not found' });
     res.json({ data: row });
   } catch (err) {
@@ -157,6 +159,7 @@ router.get('/:id', (req, res, next) => {
 
 // POST /api/expenses/apply-recurring?workspace=india
 router.post('/apply-recurring', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { month, year } = req.body;
     if (!month || !year) return res.status(400).json({ error: 'month and year are required' });
@@ -210,6 +213,7 @@ router.post('/apply-recurring', (req, res, next) => {
 
 // POST /api/expenses?workspace=india
 router.post('/', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { category_id, amount, date, description, notes, type, is_recurring } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
@@ -233,6 +237,7 @@ router.post('/', (req, res, next) => {
 
 // PUT /api/expenses/:id?workspace=india
 router.put('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const existing = db.prepare(
       'SELECT * FROM expenses WHERE id = ? AND workspace = ? AND (user_id = ? OR ?)'
@@ -261,6 +266,7 @@ router.put('/:id', (req, res, next) => {
 
 // DELETE /api/expenses/:id?workspace=india
 router.delete('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const existing = db.prepare(
       'SELECT * FROM expenses WHERE id = ? AND workspace = ? AND (user_id = ? OR ?)'

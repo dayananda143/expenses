@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, CircleDollarSign } from 'lucide-react';
+
+const ICON_MAP = {
+  'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
+  'heart-pulse': HeartPulse, 'zap': Zap, 'home': Home, 'book-open': BookOpen,
+  'plane': Plane, 'circle': Circle, 'coffee': Coffee, 'music': Music,
+  'gamepad-2': Gamepad2, 'dumbbell': Dumbbell, 'baby': Baby, 'gift': Gift,
+  'paw-print': PawPrint, 'briefcase': Briefcase, 'smartphone': Smartphone, 'shirt': Shirt,
+};
 import { useBudgets, useCreateBudget, useUpdateBudget, useDeleteBudget, useReorderBudgets } from '../hooks/useBudgets';
 import { useCategories } from '../hooks/useCategories';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -170,9 +178,15 @@ export default function BudgetsPage() {
                     <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 shrink-0 touch-none">
                       <GripVertical size={16} />
                     </div>
-                    {b.category_color && (
-                      <span className="w-9 h-9 rounded-lg shrink-0" style={{ background: b.category_color }} />
-                    )}
+                    {(() => {
+                      const IconComp = b.category_icon ? ICON_MAP[b.category_icon] : null;
+                      const bg = b.category_color ?? '#6b7280';
+                      return (
+                        <span className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-white" style={{ background: bg }}>
+                          {IconComp ? <IconComp size={18} /> : <CircleDollarSign size={18} />}
+                        </span>
+                      );
+                    })()}
                     <div>
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                         {b.category_name ?? 'Overall Spending'}

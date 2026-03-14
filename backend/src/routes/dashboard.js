@@ -23,58 +23,65 @@ router.get('/', (req, res, next) => {
     const userId = req.user.id;
     const ws = req.workspace;
 
+    // Everyone sees admin-entered expenses
+    const expUserWhere   = 'user_id IN (SELECT id FROM users WHERE is_admin = 1)';
+    const expUserParams  = [];
+    const expEUserWhere  = 'e.user_id IN (SELECT id FROM users WHERE is_admin = 1)';
+    const catCUserWhere  = 'c.user_id IN (SELECT id FROM users WHERE is_admin = 1)';
+    const catUserParams  = [];
+
     // Total for selected month
     const monthTotal = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
-    ).get(userId, ws, monthStart, monthEnd).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ?`
+    ).get(...expUserParams, ws, monthStart, monthEnd).total;
 
     const monthCredit = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND type = 'credit' AND date >= ? AND date < ?"
-    ).get(userId, ws, monthStart, monthEnd).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND type = 'credit' AND date >= ? AND date < ?`
+    ).get(...expUserParams, ws, monthStart, monthEnd).total;
 
     const monthDebit = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND type = 'debit' AND date >= ? AND date < ?"
-    ).get(userId, ws, monthStart, monthEnd).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND type = 'debit' AND date >= ? AND date < ?`
+    ).get(...expUserParams, ws, monthStart, monthEnd).total;
 
     const allTimeCredit = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND type = 'credit'"
-    ).get(userId, ws).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND type = 'credit'`
+    ).get(...expUserParams, ws).total;
 
     const allTimeDebit = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND type = 'debit'"
-    ).get(userId, ws).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND type = 'debit'`
+    ).get(...expUserParams, ws).total;
 
     // Total for selected year
     const yearTotal = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
-    ).get(userId, ws, yearStart, `${nextYear === year ? year + 1 : nextYear}-01-01`).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ?`
+    ).get(...expUserParams, ws, yearStart, `${nextYear === year ? year + 1 : nextYear}-01-01`).total;
 
     // Spending by category for selected month
     const byCategory = db.prepare(`
       SELECT c.id, c.name, c.color, c.icon, COALESCE(SUM(e.amount), 0) AS total
       FROM categories c
-      LEFT JOIN expenses e ON e.category_id = c.id AND e.user_id = ? AND e.workspace = ? AND e.date >= ? AND e.date < ?
-      WHERE c.user_id = ? AND c.workspace = ?
+      LEFT JOIN expenses e ON e.category_id = c.id AND ${expEUserWhere} AND e.workspace = ? AND e.date >= ? AND e.date < ?
+      WHERE ${catCUserWhere} AND c.workspace = ?
       GROUP BY c.id
       ORDER BY c.sort_order ASC, c.name ASC
-    `).all(userId, ws, monthStart, monthEnd, userId, ws);
+    `).all(...expUserParams, ws, monthStart, monthEnd, ...catUserParams, ws);
 
-    // Monthly spending for surrounding 12 months (6 before + selected + 5 after, capped at now)
+    // Monthly spending for surrounding 12 months
     const monthly = db.prepare(`
       SELECT strftime('%Y-%m', date) AS month, COALESCE(SUM(amount), 0) AS total
       FROM expenses
-      WHERE user_id = ? AND workspace = ? AND date >= date(?, '-11 months') AND date < date(?, '+1 month')
+      WHERE ${expUserWhere} AND workspace = ? AND date >= date(?, '-11 months') AND date < date(?, '+1 month')
       GROUP BY month
       ORDER BY month ASC
-    `).all(userId, ws, monthStart, monthStart);
+    `).all(...expUserParams, ws, monthStart, monthStart);
 
     // Previous month total (for month-over-month comparison)
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear  = month === 1 ? year - 1 : year;
     const prevMonthStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
     const prevMonthTotal = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
-    ).get(userId, ws, prevMonthStart, monthStart).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ?`
+    ).get(...expUserParams, ws, prevMonthStart, monthStart).total;
 
     // Same month last year total
     const lastYearNextMonth = month === 12 ? 1 : month + 1;
@@ -82,8 +89,8 @@ router.get('/', (req, res, next) => {
     const lastYearMonthStart = `${year - 1}-${monthPad}-01`;
     const lastYearMonthEnd   = `${lastYearNextYear}-${String(lastYearNextMonth).padStart(2, '0')}-01`;
     const sameMonthLastYearTotal = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
-    ).get(userId, ws, lastYearMonthStart, lastYearMonthEnd).total;
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ?`
+    ).get(...expUserParams, ws, lastYearMonthStart, lastYearMonthEnd).total;
 
     // Spending insights: each category this month vs 3-month average
     const threeMonthsAgoDate = new Date(year, month - 1 - 3, 1);
@@ -93,12 +100,12 @@ router.get('/', (req, res, next) => {
       .map((c) => {
         const { avg } = db.prepare(`
           SELECT COALESCE(SUM(amount), 0) / 3.0 AS avg FROM expenses
-          WHERE user_id = ? AND workspace = ? AND category_id = ? AND date >= ? AND date < ?
-        `).get(userId, ws, c.id, threeMonthsAgoStr, monthStart);
+          WHERE ${expUserWhere} AND workspace = ? AND category_id = ? AND date >= ? AND date < ?
+        `).get(...expUserParams, ws, c.id, threeMonthsAgoStr, monthStart);
         if (avg === 0) return null;
         const changePercent = Math.round(((c.total - avg) / avg) * 100);
-        if (Math.abs(changePercent) < 5) return null; // skip negligible changes
-        return { id: c.id, name: c.name, color: c.color, thisMonth: c.total, avg3: avg, changePercent };
+        if (Math.abs(changePercent) < 5) return null;
+        return { id: c.id, name: c.name, color: c.color, icon: c.icon, thisMonth: c.total, avg3: avg, changePercent };
       })
       .filter(Boolean)
       .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
@@ -109,12 +116,12 @@ router.get('/', (req, res, next) => {
       SELECT e.id, e.description, e.amount, e.date, e.type, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
       FROM expenses e
       LEFT JOIN categories c ON e.category_id = c.id
-      WHERE e.user_id = ? AND e.workspace = ? AND e.date >= ? AND e.date < ?
+      WHERE ${expEUserWhere} AND e.workspace = ? AND e.date >= ? AND e.date < ?
       ORDER BY e.date DESC, e.id DESC
       LIMIT 5
-    `).all(userId, ws, monthStart, monthEnd);
+    `).all(...expUserParams, ws, monthStart, monthEnd);
 
-    // Budget status (always based on selected month/year for monthly, selected year for yearly)
+    // Budget status — use current user's budgets but spend from correct expense scope
     const budgets = db.prepare(`
       SELECT b.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
       FROM budgets b
@@ -126,10 +133,12 @@ router.get('/', (req, res, next) => {
     const budgetStatus = budgets.map((b) => {
       const periodStart = b.period === 'monthly' ? monthStart : yearStart;
       const periodEnd   = b.period === 'monthly' ? monthEnd   : `${year + 1}-01-01`;
+      const catClause   = b.category_id ? 'AND category_id = ?' : '';
+      const catParam    = b.category_id ? [b.category_id] : [];
       const spent = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) AS total FROM expenses
-        WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ? ${b.category_id ? 'AND category_id = ?' : ''}
-      `).get(...(b.category_id ? [userId, ws, periodStart, periodEnd, b.category_id] : [userId, ws, periodStart, periodEnd])).total;
+        WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ? ${catClause}
+      `).get(...expUserParams, ws, periodStart, periodEnd, ...catParam).total;
       return { ...b, spent };
     });
 

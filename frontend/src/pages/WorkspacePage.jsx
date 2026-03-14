@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { Sun, Moon, CreditCard, LogOut, TrendingUp, PiggyBank, ArrowRight } from 'lucide-react';
+import { US, IN } from 'country-flag-icons/react/3x2';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useTheme } from '../contexts/ThemeContext';
+
+const FLAG_COMPONENTS = { us: US, india: IN };
 
 function WorkspaceIllustration() {
   return (
@@ -105,7 +108,7 @@ export default function WorkspacePage() {
   const tiles = [
     ...allowed.map(ws => ({
       key: ws,
-      emoji: WORKSPACE_CONFIG[ws].flag,
+      FlagComp: FLAG_COMPONENTS[ws] ?? null,
       label: WORKSPACE_CONFIG[ws].label,
       sub: WORKSPACE_CONFIG[ws].currency,
       Icon: TrendingUp,
@@ -114,7 +117,7 @@ export default function WorkspacePage() {
     })),
     ...(user?.accounts_access ? [{
       key: 'accounts',
-      emoji: null,
+      FlagComp: null,
       label: 'Credit & Savings',
       sub: 'Manage accounts',
       Icon: CreditCard,
@@ -200,16 +203,16 @@ export default function WorkspacePage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {tiles.map(({ key, emoji, label, sub, Icon, onClick, style }) => (
+              {tiles.map(({ key, FlagComp, label, sub, Icon, onClick, style }) => (
                 <button
                   key={key}
                   onClick={onClick}
                   className={`group w-full flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-100 dark:border-gray-800 ${style.border} shadow-sm hover:shadow-md ${style.glow} transition-all duration-200 text-left`}
                 >
                   {/* Icon */}
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${style.gradient} flex items-center justify-center shrink-0 shadow-sm`}>
-                    {emoji
-                      ? <span className="text-2xl leading-none">{emoji}</span>
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${style.gradient} flex items-center justify-center shrink-0 shadow-sm overflow-hidden`}>
+                    {FlagComp
+                      ? <FlagComp className="w-10 h-auto" />
                       : <Icon size={22} className="text-white" />
                     }
                   </div>

@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine } from 'recharts';
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, CircleDollarSign, Tag } from 'lucide-react';
+
+const ICON_MAP = {
+  'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
+  'heart-pulse': HeartPulse, 'zap': Zap, 'home': Home, 'book-open': BookOpen,
+  'plane': Plane, 'circle': Circle, 'coffee': Coffee, 'music': Music,
+  'gamepad-2': Gamepad2, 'dumbbell': Dumbbell, 'baby': Baby, 'gift': Gift,
+  'paw-print': PawPrint, 'briefcase': Briefcase, 'smartphone': Smartphone, 'shirt': Shirt,
+};
 import client from '../api/client';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
@@ -272,7 +280,7 @@ export default function DashboardPage() {
                         className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors"
                         onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${ins.id}`)}
                       >
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ins.color }} />
+                        {(() => { const I = ICON_MAP[ins.icon] ?? Tag; return <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: ins.color }}><I size={14} /></span>; })()}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{ins.name}</p>
                           <p className="text-xs text-gray-400 dark:text-gray-500">{fmtRound(ins.thisMonth)} this month</p>
@@ -334,13 +342,11 @@ export default function DashboardPage() {
                         <div key={b.id}>
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2">
-                              {over
-                                ? <AlertTriangle size={14} className="text-red-500" />
-                                : <CheckCircle size={14} className="text-emerald-500" />
-                              }
+                              {(() => { const I = b.category_icon ? ICON_MAP[b.category_icon] : null; const bg = b.category_color ?? '#6b7280'; return <span className="w-6 h-6 rounded flex items-center justify-center text-white shrink-0" style={{ background: bg }}>{I ? <I size={12} /> : <CircleDollarSign size={12} />}</span>; })()}
                               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {b.category_name ?? 'Overall'} ({b.period})
                               </span>
+                              {over ? <AlertTriangle size={13} className="text-red-500" /> : <CheckCircle size={13} className="text-emerald-500" />}
                             </div>
                             <span className={`text-xs font-semibold ${over ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
                               {fmtRound(b.spent)} / {fmtRound(b.amount)}
@@ -413,7 +419,7 @@ export default function DashboardPage() {
                     </h2>
                     <span className="text-xs text-gray-400 dark:text-gray-500">Click a slice to filter</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={180}>
                     <PieChart>
                       <Pie
                         data={catData}
@@ -421,7 +427,7 @@ export default function DashboardPage() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
+                        outerRadius={75}
                       >
                         {catData.map((entry) => (
                           <Cell
@@ -433,9 +439,26 @@ export default function DashboardPage() {
                         ))}
                       </Pie>
                       <Tooltip formatter={(v) => fmtRound(v)} contentStyle={tooltipStyle} />
-                      <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, color: tickColor }} />
                     </PieChart>
                   </ResponsiveContainer>
+                  <div className="mt-2 flex flex-col gap-1.5 max-h-32 overflow-y-auto">
+                    {catData.map((entry) => {
+                      const I = ICON_MAP[entry.icon] ?? Tag;
+                      return (
+                        <div
+                          key={entry.id}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 py-0.5"
+                          onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                        >
+                          <span className="w-5 h-5 rounded flex items-center justify-center text-white shrink-0" style={{ background: entry.color }}>
+                            {I ? <I size={11} /> : null}
+                          </span>
+                          <span className="text-xs text-gray-600 dark:text-gray-400 flex-1 truncate">{entry.name}</span>
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 shrink-0">{fmtRound(entry.total)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -458,10 +481,7 @@ export default function DashboardPage() {
                   {recent.map((e) => (
                     <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
                       <div className="flex items-center gap-3">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ background: e.category_color ?? '#6b7280' }}
-                        />
+                        {(() => { const I = ICON_MAP[e.category_icon] ?? Tag; const bg = e.category_color ?? '#6b7280'; return <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: bg }}><I size={14} /></span>; })()}
                         <div>
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{e.description}</p>
                           <p className="text-xs text-gray-400 dark:text-gray-500">{e.category_name ?? 'Uncategorised'} · {e.date}</p>

@@ -16,9 +16,11 @@ router.use((req, res, next) => {
 // GET /api/accounts?workspace=india
 router.get('/', (req, res, next) => {
   try {
+    // Non-admins see admin's accounts
+    const targetId = req.user.is_admin ? req.user.id : db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get()?.id;
     const rows = db.prepare(
       'SELECT * FROM accounts WHERE user_id = ? AND workspace = ? ORDER BY sort_order ASC, created_at ASC'
-    ).all(req.user.id, req.workspace);
+    ).all(targetId, req.workspace);
     res.json({ data: rows });
   } catch (err) {
     next(err);
@@ -27,6 +29,7 @@ router.get('/', (req, res, next) => {
 
 // POST /api/accounts?workspace=india
 router.post('/', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
@@ -46,6 +49,7 @@ router.post('/', (req, res, next) => {
 
 // PATCH /api/accounts/reorder?workspace=india
 router.patch('/reorder', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
@@ -59,6 +63,7 @@ router.patch('/reorder', (req, res, next) => {
 
 // PUT /api/accounts/:id?workspace=india
 router.put('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND user_id = ? AND workspace = ?').get(req.params.id, req.user.id, req.workspace);
     if (!account) return res.status(404).json({ error: 'Account not found' });
@@ -80,6 +85,7 @@ router.put('/:id', (req, res, next) => {
 
 // DELETE /api/accounts/:id?workspace=india
 router.delete('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND user_id = ? AND workspace = ?').get(req.params.id, req.user.id, req.workspace);
     if (!account) return res.status(404).json({ error: 'Account not found' });

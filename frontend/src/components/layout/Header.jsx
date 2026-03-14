@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, LogOut, KeyRound, ChevronDown, Receipt, Sun, Moon, ArrowLeftRight, ShieldCheck, ShieldOff } from 'lucide-react';
+import { US, IN } from 'country-flag-icons/react/3x2';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+
+const FLAG_COMPONENTS = { us: US, india: IN };
 import ChangePasswordModal from '../auth/ChangePasswordModal';
 import TwoFactorModal from '../auth/TwoFactorModal';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
   const { dark, toggle } = useTheme();
-  const { config, clearWorkspace } = useWorkspace();
+  const { workspace, config, clearWorkspace } = useWorkspace();
   const navigate = useNavigate();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
@@ -48,13 +51,13 @@ export default function Header({ onMenuClick }) {
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-emerald-400 dark:hover:border-emerald-600 text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-xs font-medium"
               title="Switch workspace"
             >
-              <span>{config.flag}</span>
+              {(() => { const F = FLAG_COMPONENTS[workspace]; return F ? <F className="w-4 h-auto rounded-sm shrink-0" /> : null; })()}
               <span className="hidden sm:inline">{config.label}</span>
               <ArrowLeftRight size={12} />
             </button>
           )}
 
-          <button
+<button
             onClick={toggle}
             className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md transition-colors"
             title={dark ? 'Switch to light mode' : 'Switch to dark mode'}

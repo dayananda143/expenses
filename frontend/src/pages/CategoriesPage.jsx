@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt } from 'lucide-react';
+
+const ICON_MAP = {
+  'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
+  'heart-pulse': HeartPulse, 'zap': Zap, 'home': Home, 'book-open': BookOpen,
+  'plane': Plane, 'circle': Circle, 'coffee': Coffee, 'music': Music,
+  'gamepad-2': Gamepad2, 'dumbbell': Dumbbell, 'baby': Baby, 'gift': Gift,
+  'paw-print': PawPrint, 'briefcase': Briefcase, 'smartphone': Smartphone, 'shirt': Shirt,
+};
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useReorderCategories } from '../hooks/useCategories';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
@@ -187,12 +195,12 @@ export default function CategoriesPage() {
                     <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 shrink-0 touch-none">
                       <GripVertical size={16} />
                     </div>
-                    <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: c.color }}>
-                      {c.name[0]}
+                    <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: c.color }}>
+                      {ICON_MAP[c.icon] ? (() => { const I = ICON_MAP[c.icon]; return <I size={18} />; })() : <span className="text-xs font-bold">{c.name[0]}</span>}
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{c.name}</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">{c.icon}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">{c.icon}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">

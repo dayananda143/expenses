@@ -2,8 +2,11 @@ import { useState, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { useAccounts, useDeleteAccount, useReorderAccounts } from '../../hooks/useAccounts';
 import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm } from './shared';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SavingsPage() {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const { data, isLoading } = useAccounts(WS);
   const deleteAccount = useDeleteAccount(WS);
   const reorder = useReorderAccounts(WS);
@@ -64,12 +67,14 @@ export default function SavingsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Savings</h1>
           <p className="text-sm text-gray-400 mt-0.5">Total: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{fmtUSD(totalBalance)}</span></p>
         </div>
-        <button
-          onClick={() => setModal('new')}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus size={15} /> Add Account
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setModal('new')}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus size={15} /> Add Account
+          </button>
+        )}
       </div>
 
       {isLoading && (

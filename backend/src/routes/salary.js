@@ -5,7 +5,9 @@ const db = require('../db/database');
 // GET /api/salary/settings
 router.get('/settings', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT monthly_amount FROM salary_settings WHERE user_id = ?').get(req.user.id);
+    // Non-admins see admin's salary settings
+    const targetId = req.user.is_admin ? req.user.id : db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get()?.id;
+    const row = db.prepare('SELECT monthly_amount FROM salary_settings WHERE user_id = ?').get(targetId);
     res.json({ monthly_amount: row?.monthly_amount ?? 0 });
   } catch (err) {
     next(err);
@@ -14,6 +16,7 @@ router.get('/settings', (req, res, next) => {
 
 // PUT /api/salary/settings
 router.put('/settings', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { monthly_amount } = req.body;
     const amount = parseFloat(monthly_amount);
@@ -31,12 +34,14 @@ router.put('/settings', (req, res, next) => {
 // GET /api/salary/summary
 router.get('/summary', (req, res, next) => {
   try {
-    const settings = db.prepare('SELECT monthly_amount FROM salary_settings WHERE user_id = ?').get(req.user.id);
+    // Non-admins see admin's salary data
+    const targetId = req.user.is_admin ? req.user.id : db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get()?.id;
+    const settings = db.prepare('SELECT monthly_amount FROM salary_settings WHERE user_id = ?').get(targetId);
     const monthly = settings?.monthly_amount ?? 0;
 
     const spent = db.prepare(
       'SELECT COALESCE(SUM(amount), 0) AS total FROM salary_entries WHERE user_id = ?'
-    ).get(req.user.id).total;
+    ).get(targetId).total;
 
     res.json({ salary: monthly, remaining: monthly - spent });
   } catch (err) {
@@ -54,8 +59,10 @@ router.get('/', (req, res, next) => {
     const limit = 50;
     const offset = (parseInt(page) - 1) * limit;
 
+    // Non-admins see admin's salary entries
+    const targetId = req.user.is_admin ? req.user.id : db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get()?.id;
     let where = 's.user_id = ?';
-    const params = [req.user.id];
+    const params = [targetId];
 
     if (search) {
       where += ' AND (s.description LIKE ? OR s.notes LIKE ?)';
@@ -81,6 +88,7 @@ router.get('/', (req, res, next) => {
 
 // POST /api/salary
 router.post('/', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const { description, amount, notes } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
@@ -100,6 +108,7 @@ router.post('/', (req, res, next) => {
 
 // PUT /api/salary/:id
 router.put('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const row = db.prepare('SELECT * FROM salary_entries WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
@@ -122,6 +131,7 @@ router.put('/:id', (req, res, next) => {
 
 // DELETE /api/salary/:id
 router.delete('/:id', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
     const row = db.prepare('SELECT * FROM salary_entries WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
     if (!row) return res.status(404).json({ error: 'Not found' });

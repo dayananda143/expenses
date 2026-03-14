@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const WS = 'us';
 
@@ -227,6 +228,8 @@ function DetailRow({ label, value, valueClass }) {
 }
 
 export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const isSavings = a.type === 'savings';
   const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
   const available = a.credit_limit != null ? a.credit_limit - a.balance : null;
@@ -340,7 +343,7 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
           >
             <Pencil size={13} /> Edit
           </button>
-          {!isSavings && onPayment && (
+          {!isSavings && onPayment && isAdmin && (
             <button
               onClick={() => { onClose(); onPayment(a); }}
               className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
@@ -357,6 +360,8 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
 // ─── Account Card ─────────────────────────────────────────────────────────────
 
 export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDrop, onPayment, onView }) {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const isSavings = a.type === 'savings';
   const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
   const available = a.credit_limit != null ? a.credit_limit - a.balance : null;
@@ -439,7 +444,7 @@ export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDr
               );
             })()}
             <div className="flex flex-wrap items-center gap-2">
-              {onPayment && (
+              {onPayment && isAdmin && (
                 <button
                   onClick={() => onPayment(a)}
                   className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 px-2.5 py-1 rounded-lg transition-colors"

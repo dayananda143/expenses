@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X, ShieldCheck, ShieldOff, UserCheck, UserX, CreditCard, HeartPulse, Pencil, Eye, EyeOff } from 'lucide-react';
+import { US, IN } from 'country-flag-icons/react/3x2';
 import client from '../api/client';
+
+const FLAG_COMPONENTS = { india: IN, us: US };
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -12,8 +15,8 @@ import { useAuth } from '../contexts/AuthContext';
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
 const WORKSPACE_OPTIONS = [
-  { value: 'india', label: '🇮🇳 Indian Expenses' },
-  { value: 'us',    label: '🇺🇸 US Expenses' },
+  { value: 'india', label: 'Indian Expenses' },
+  { value: 'us',    label: 'US Expenses' },
 ];
 
 function NewUserModal({ onClose }) {
@@ -75,12 +78,13 @@ function NewUserModal({ onClose }) {
                   key={opt.value}
                   type="button"
                   onClick={() => toggleWorkspace(opt.value)}
-                  className={`flex-1 py-2 px-3 text-xs rounded-lg border transition-colors ${
+                  className={`flex-1 py-2 px-3 text-xs rounded-lg border transition-colors flex items-center justify-center gap-1.5 ${
                     selectedWorkspaces.includes(opt.value)
                       ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
                       : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
                   }`}
                 >
+                  {(() => { const F = FLAG_COMPONENTS[opt.value]; return F ? <F className="w-4 h-auto rounded-sm shrink-0" /> : null; })()}
                   {opt.label}
                 </button>
               ))}
@@ -335,13 +339,11 @@ export default function UsersPage() {
                               onClick={() => !isSelf && !u.is_admin && toggleWorkspace(u, opt.value)}
                               disabled={isSelf || u.is_admin}
                               title={u.is_admin ? 'Admins have full access' : opt.label}
-                              className={`px-1.5 py-0.5 rounded text-xs transition-colors ${
-                                hasAccess
-                                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
-                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-600'
-                              } ${!isSelf && !u.is_admin ? 'cursor-pointer hover:opacity-75' : 'cursor-default'}`}
+                              className={`p-0.5 rounded-md transition-all ${
+                                hasAccess ? '' : 'opacity-25 grayscale'
+                              } ${!isSelf && !u.is_admin ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
                             >
-                              {opt.value === 'india' ? '🇮🇳' : '🇺🇸'}
+                              {(() => { const F = FLAG_COMPONENTS[opt.value]; return F ? <F className="w-6 h-auto rounded-sm block" /> : opt.value; })()}
                             </button>
                           );
                         })}

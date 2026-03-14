@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload } from 'lucide-react';
+import Papa from 'papaparse';
 import {
   useHospitalExpenses,
   useHospitalSummary,
@@ -175,13 +176,14 @@ export default function HospitalPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
+  const fileRef = useRef(null);
 
   const now = new Date();
   const [month, setMonth]   = useState(null);
   const [year, setYear]     = useState(now.getFullYear());
   const [search, setSearch] = useState('');
   const [page, setPage]     = useState(1);
-  const [limit, setLimit]   = useState(25);
+  const [limit, setLimit]   = useState(10);
   const [filterUser, setFilterUser] = useState('');
   const [sort, setSort]   = useState('date');
   const [order, setOrder] = useState('desc');
@@ -215,6 +217,46 @@ export default function HospitalPage() {
   const total = data?.total ?? 0;
   const pages = data?.pages ?? 1;
 
+  function handleExport() {
+    const qp = {};
+    if (month) { qp.month = month; qp.year = year; } else if (year) { qp.year = year; }
+    if (search) qp.search = search;
+    if (isAdmin && filterUser) qp.user_id = filterUser;
+    const queryStr = new URLSearchParams(qp).toString();
+    const url = `/api/hospital-expenses/export/csv${queryStr ? `?${queryStr}` : ''}`;
+    const token = localStorage.getItem('expenses_token');
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.blob())
+      .then((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `hospital-expenses-${now.toISOString().split('T')[0]}.csv`;
+        a.click();
+      });
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: async ({ data: importRows }) => {
+        try {
+          const token = localStorage.getItem('expenses_token');
+          const res = await fetch('/api/hospital-expenses/import/csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ rows: importRows }),
+          });
+          const result = await res.json();
+          if (!res.ok) throw result;
+          toast(`Imported ${result.imported} record(s)${result.errors.length ? ` (${result.errors.length} skipped)` : ''}`);
+        } catch (err) { toast(err?.error ?? 'Import failed', 'error'); }
+      },
+    });
+    e.target.value = '';
+  }
+
   async function handleDelete() {
     try {
       await del.mutateAsync(deleteTarget.id);
@@ -225,7 +267,7 @@ export default function HospitalPage() {
     }
   }
 
-  const colSpan = isAdmin ? 6 : 5;
+  const colSpan = isAdmin ? 6 : 4;
 
   return (
     <div className="space-y-4">
@@ -241,28 +283,34 @@ export default function HospitalPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Show</span>
-            {[5, 10, 15, 20, 25].map((n) => (
-              <button
-                key={n}
-                onClick={() => { setLimit(n); setPage(1); }}
-                className={`px-2.5 py-1 text-xs rounded border transition-colors ${
-                  limit === n
-                    ? 'bg-rose-600 text-white border-rose-600'
-                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Show</span>
+            <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden text-xs font-medium">
+              {[5, 10, 15, 20, 25].map((n) => (
+                <button key={n} onClick={() => { setLimit(n); setPage(1); }}
+                  className={`px-2.5 py-1 transition-colors ${limit === n ? 'bg-rose-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
-          >
-            <Plus size={15} /> Add Expense
+          <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <Download size={15} /><span className="hidden sm:inline">Export</span>
           </button>
+          {isAdmin && (
+            <>
+              <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <Upload size={15} /><span className="hidden sm:inline">Import</span>
+              </button>
+              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
+              >
+                <Plus size={15} /> Add Expense
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -340,7 +388,7 @@ export default function HospitalPage() {
                   <th onClick={() => handleSort('amount')} className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors">
                     <span className="inline-flex items-center gap-1 flex-row-reverse">Amount (USD) <SortIcon field="amount" sort={sort} order={order} /></span>
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>
+                  {isAdmin && <th className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -372,16 +420,18 @@ export default function HospitalPage() {
                         ? <span className="text-rose-600 dark:text-rose-400">{fmt(row.amount)}</span>
                         : <span className="text-gray-400 dark:text-gray-500">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <button onClick={() => setEditTarget(row)} className="p-1.5 text-gray-400 hover:text-rose-600 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => setDeleteTarget(row)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button onClick={() => setEditTarget(row)} className="p-1.5 text-gray-400 hover:text-rose-600 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => setDeleteTarget(row)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -391,50 +441,40 @@ export default function HospitalPage() {
 
           {/* Pagination */}
           {pages > 1 && (
-            <div className="flex justify-center">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                {(() => {
-                  const btns = [];
-                  for (let i = 1; i <= pages; i++) {
-                    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) {
-                      btns.push(i);
-                    } else if (btns[btns.length - 1] !== '…') {
-                      btns.push('…');
-                    }
-                  }
-                  return btns.map((b, idx) =>
-                    b === '…' ? (
-                      <span key={`e${idx}`} className="px-1 text-gray-400 dark:text-gray-500 text-sm select-none">…</span>
-                    ) : (
-                      <button
-                        key={b}
-                        onClick={() => setPage(b)}
-                        className={`min-w-[32px] h-8 px-2 text-sm rounded border transition-colors ${
-                          page === b
-                            ? 'bg-rose-600 text-white border-rose-600'
-                            : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {b}
-                      </button>
-                    )
-                  );
-                })()}
-                <button
-                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                  disabled={page === pages}
-                  className="p-1.5 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
+            <div className="flex justify-center px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+              {(() => {
+                const range = [];
+                for (let i = 1; i <= pages; i++) {
+                  if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) range.push(i);
+                }
+                const withEllipsis = [];
+                let prev = null;
+                for (const p of range) {
+                  if (prev !== null && p - prev > 1) withEllipsis.push('...' + p);
+                  withEllipsis.push(p);
+                  prev = p;
+                }
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                      className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                      <ChevronLeft size={14} />
+                    </button>
+                    {withEllipsis.map((p, i) =>
+                      typeof p === 'string'
+                        ? <span key={p + i} className="text-xs text-gray-300 dark:text-gray-600 px-1">…</span>
+                        : <button key={p} onClick={() => setPage(p)}
+                            className={`min-w-[28px] h-7 rounded-lg text-xs font-medium transition-colors ${p === page ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+                            {p}
+                          </button>
+                    )}
+                    <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages}
+                      className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-25 disabled:cursor-not-allowed transition-colors">
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </>

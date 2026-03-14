@@ -5,20 +5,22 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
 const allLinks = [
-  { to: '/dashboard',  label: 'Dashboard',  Icon: LayoutDashboard, indiaHide: false },
-  { to: '/expenses',   label: 'Expenses',    Icon: Receipt,         indiaHide: false },
-  { to: '/categories', label: 'Categories',  Icon: Tag,             indiaHide: true  },
-  { to: '/budgets',    label: 'Budgets',     Icon: Target,          indiaHide: true  },
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard, indiaHide: false },
+  { to: '/expenses',  label: 'Expenses',  Icon: Receipt,         indiaHide: false },
 ];
 
 const adminLinks = [
-  { to: '/users', label: 'Users', Icon: Users },
+  { to: '/users',      label: 'Users',      Icon: Users  },
+  { to: '/categories', label: 'Categories', Icon: Tag,    indiaHide: true },
+  { to: '/budgets',    label: 'Budgets',    Icon: Target, indiaHide: true },
 ];
 
 export default function Sidebar({ onClose }) {
   const { user } = useAuth();
   const { workspace } = useWorkspace();
+  const isAdmin = !!user?.is_admin;
   const links = allLinks.filter(l => !(l.indiaHide && workspace === 'india'));
+  const visibleAdminLinks = adminLinks.filter(l => !(l.indiaHide && workspace === 'india'));
   const showHospital = user?.is_admin || user?.hospital_access;
 
   const linkClass = ({ isActive }) =>
@@ -69,12 +71,12 @@ export default function Sidebar({ onClose }) {
           </NavLink>
         )}
 
-        {!!user?.is_admin && (
+        {isAdmin && (
           <>
             <div className="pt-2 pb-1 px-3">
               <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">Admin</span>
             </div>
-            {adminLinks.map(({ to, label, Icon }) => (
+            {visibleAdminLinks.map(({ to, label, Icon }) => (
               <NavLink key={to} to={to} className={linkClass} onClick={onClose}>
                 <Icon size={16} />
                 {label}
