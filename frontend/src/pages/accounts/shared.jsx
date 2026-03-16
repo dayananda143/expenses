@@ -6,6 +6,80 @@ import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, T
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAuth } from '../../contexts/AuthContext';
 
+// ─── Bank Logo ────────────────────────────────────────────────────────────────
+
+const BANK_CONFIGS = [
+  { match: /wells.?fargo/i,        domain: 'wellsfargo.com',       bg: 'bg-red-50 dark:bg-red-900/20'    },
+  { match: /\bciti(bank)?\b/i,      domain: 'citibank.com',          bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /citizen/i,             domain: 'citizensbank.com',      bg: 'bg-green-50 dark:bg-green-900/20' },
+  { match: /optum/i,               domain: 'optum.com',             bg: 'bg-white dark:bg-gray-800'       },
+  { match: /chase/i,               domain: 'chase.com',             bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /amex|american.?express/i, domain: 'americanexpress.com', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+  { match: /discover/i,            domain: 'discover.com',          bg: 'bg-orange-50 dark:bg-orange-900/20' },
+  { match: /capital.?one/i,        domain: 'capitalone.com',        bg: 'bg-red-50 dark:bg-red-900/20'    },
+  { match: /bank.?of.?america/i,   domain: 'bankofamerica.com',     bg: 'bg-red-50 dark:bg-red-900/20'    },
+  { match: /apple/i,               domain: 'apple.com',             bg: 'bg-gray-50 dark:bg-gray-800'     },
+  { match: /paypal/i,              domain: 'paypal.com',            bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /synchrony/i,           domain: 'synchrony.com',         bg: 'bg-purple-50 dark:bg-purple-900/20' },
+  { match: /us.?bank/i,            domain: 'usbank.com',            bg: 'bg-red-50 dark:bg-red-900/20'    },
+  { match: /401k|principal/i,      domain: 'principal.com',         bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /ally/i,               domain: 'ally.com',              bg: 'bg-purple-50 dark:bg-purple-900/20' },
+  { match: /marcus|goldman/i,     domain: 'marcus.com',            bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /sofi/i,               domain: 'sofi.com',              bg: 'bg-green-50 dark:bg-green-900/20' },
+  { match: /fidelity/i,           domain: 'fidelity.com',          bg: 'bg-green-50 dark:bg-green-900/20' },
+  { match: /vanguard/i,           domain: 'vanguard.com',          bg: 'bg-red-50 dark:bg-red-900/20'    },
+  { match: /schwab/i,             domain: 'schwab.com',            bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /td.?bank/i,           domain: 'td.com',                bg: 'bg-green-50 dark:bg-green-900/20' },
+  { match: /pnc/i,                domain: 'pnc.com',               bg: 'bg-orange-50 dark:bg-orange-900/20' },
+  { match: /fifth.?third/i,       domain: '53.com',                bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /regions/i,            domain: 'regions.com',           bg: 'bg-green-50 dark:bg-green-900/20' },
+  { match: /truist/i,             domain: 'truist.com',            bg: 'bg-purple-50 dark:bg-purple-900/20' },
+  { match: /navy.?federal/i,      domain: 'navyfederal.org',       bg: 'bg-blue-50 dark:bg-blue-900/20'  },
+  { match: /robinhood/i,          domain: 'robinhood.com',         bg: 'bg-green-50 dark:bg-green-900/20' },
+];
+
+export function getBankConfig(name) {
+  return BANK_CONFIGS.find((b) => b.match.test(name ?? '')) ?? null;
+}
+
+const INITIAL_COLORS = [
+  'bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-violet-500',
+  'bg-amber-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+  'bg-orange-500', 'bg-cyan-500', 'bg-purple-500', 'bg-lime-500',
+];
+
+function nameToColor(name) {
+  let hash = 0;
+  for (let i = 0; i < (name?.length ?? 0); i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return INITIAL_COLORS[Math.abs(hash) % INITIAL_COLORS.length];
+}
+
+export function BankLogo({ name, sizeClass = 'w-9 h-9', fallback }) {
+  const bank = getBankConfig(name);
+  const [failed, setFailed] = useState(false);
+
+  if (!bank || failed) {
+    if (fallback !== undefined) return fallback;
+    const initial = (name ?? '?')[0].toUpperCase();
+    return (
+      <div className={`${sizeClass} rounded-xl flex items-center justify-center shrink-0 ${nameToColor(name)}`}>
+        <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(10px, 40%, 16px)' }}>{initial}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${sizeClass} rounded-xl flex items-center justify-center overflow-hidden shrink-0 ${bank.bg}`}>
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${bank.domain}&sz=64`}
+        alt=""
+        className="w-full h-full object-contain p-1.5"
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
 export const WS = 'us';
 
 export function fmtUSD(n) {
@@ -119,6 +193,7 @@ export function AccountModal({ account, defaultType, onClose }) {
     } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '' },
   });
   const type = watch('type');
+  const name = watch('name');
 
   async function onSubmit(data) {
     const payload = {
@@ -139,9 +214,11 @@ export function AccountModal({ account, defaultType, onClose }) {
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm max-h-[92vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${type === 'credit' ? 'bg-rose-100 dark:bg-rose-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
-              {type === 'credit' ? <CreditCard size={14} className="text-rose-600 dark:text-rose-400" /> : <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />}
-            </div>
+            <BankLogo name={name} sizeClass="w-8 h-8" fallback={type === 'savings' ? (
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30">
+                <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+            ) : undefined} />
             <h2 className="text-base font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Account' : 'New Account'}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
@@ -245,9 +322,11 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
         {/* Header */}
         <div className={`px-5 py-4 flex items-center justify-between ${isSavings ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSavings ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-rose-100 dark:bg-rose-900/40'}`}>
-              {isSavings ? <PiggyBank size={18} className="text-emerald-600 dark:text-emerald-400" /> : <CreditCard size={18} className="text-rose-600 dark:text-rose-400" />}
-            </div>
+            <BankLogo name={a.name} sizeClass="w-10 h-10" fallback={isSavings ? (
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/40">
+                <PiggyBank size={18} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+            ) : undefined} />
             <div>
               <p className="text-base font-bold text-gray-900 dark:text-white">{a.name}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{a.type} account{!a.is_active ? ' · Inactive' : ''}</p>
@@ -383,9 +462,11 @@ export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDr
         <div className="flex items-start justify-between gap-3">
           <button onClick={() => onView?.(a)} className="flex items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity">
             <GripVertical size={15} className="text-gray-300 dark:text-gray-700 cursor-grab shrink-0" />
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isSavings ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-rose-100 dark:bg-rose-900/30'}`}>
-              {isSavings ? <PiggyBank size={16} className="text-emerald-600 dark:text-emerald-400" /> : <CreditCard size={16} className="text-rose-600 dark:text-rose-400" />}
-            </div>
+            <BankLogo name={a.name} sizeClass="w-9 h-9" fallback={isSavings ? (
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                <PiggyBank size={16} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+            ) : undefined} />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{a.name}</p>

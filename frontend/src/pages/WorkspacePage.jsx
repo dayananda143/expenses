@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Sun, Moon, CreditCard, LogOut, TrendingUp, PiggyBank, ArrowRight } from 'lucide-react';
+import { Sun, Moon, CreditCard, LogOut, TrendingUp, PiggyBank, ArrowRight, Landmark } from 'lucide-react';
 import { US, IN } from 'country-flag-icons/react/3x2';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
@@ -120,7 +120,7 @@ export default function WorkspacePage() {
       FlagComp: null,
       label: 'Credit & Savings',
       sub: 'Manage accounts',
-      Icon: CreditCard,
+      Icon: Landmark,
       onClick: () => navigate('/accounts'),
       style: TILE_STYLES.accounts,
     }] : []),

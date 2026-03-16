@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar } from 'lucide-react';
 import { useAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
-import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal } from './shared';
+import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal, AccountModal, BankLogo } from './shared';
 
 function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }) {
   return (
@@ -23,6 +23,7 @@ function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }
 function AccountsBreakdown({ savings, credits }) {
   const [tab, setTab] = useState('credit');
   const [viewAccount, setViewAccount] = useState(null);
+  const [editAccount, setEditAccount] = useState(null);
   const list = tab === 'credit' ? credits : savings;
   const total = list.reduce((s, a) => s + (a.balance ?? 0), 0);
 
@@ -60,12 +61,11 @@ function AccountsBreakdown({ savings, credits }) {
                   onClick={() => setViewAccount(a)}
                   className="w-full flex items-center gap-3 py-2 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl px-2 -mx-2 transition-colors text-left"
                 >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isSavings ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-rose-100 dark:bg-rose-900/30'}`}>
-                    {isSavings
-                      ? <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
-                      : <CreditCard size={14} className="text-rose-600 dark:text-rose-400" />
-                    }
-                  </div>
+                  <BankLogo name={a.name} sizeClass="w-8 h-8" fallback={isSavings ? (
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                      <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                  ) : undefined} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
                     {pct !== null && (
@@ -94,8 +94,11 @@ function AccountsBreakdown({ savings, credits }) {
         <AccountDetailModal
           a={viewAccount}
           onClose={() => setViewAccount(null)}
-          onEdit={() => setViewAccount(null)}
+          onEdit={(acc) => { setViewAccount(null); setEditAccount(acc); }}
         />
+      )}
+      {editAccount && (
+        <AccountModal account={editAccount} onClose={() => setEditAccount(null)} />
       )}
     </div>
   );
@@ -199,9 +202,12 @@ export default function AccountsDashboard() {
             <div className="space-y-3">
               {upcomingDue.map((a) => (
                 <div key={a.id} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
-                    <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <BankLogo name={a.name} sizeClass="w-7 h-7" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
+                      <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
+                    </div>
                   </div>
                   <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
                 </div>
@@ -223,9 +229,12 @@ export default function AccountsDashboard() {
             <div className="space-y-3">
               {recentPayments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{p.account_name}</p>
-                    {p.notes && <p className="text-xs text-gray-400 truncate">{p.notes}</p>}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <BankLogo name={p.account_name} sizeClass="w-7 h-7" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{p.account_name}</p>
+                      {p.notes && <p className="text-xs text-gray-400 truncate">{p.notes}</p>}
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{fmtUSDDecimal(p.amount)}</p>

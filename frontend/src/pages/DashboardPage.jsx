@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, CircleDollarSign, Tag } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, CircleDollarSign, Tag, ArrowDownLeft, ArrowUpRight, Wallet, Scale } from 'lucide-react';
 
 const ICON_MAP = {
   'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
@@ -139,31 +139,37 @@ export default function DashboardPage() {
             <>
               {/* Ledger stat cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className={`${card} border-l-4 border-emerald-500`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Credit</span>
-                    <TrendingUp size={16} className="text-emerald-600" />
+                <div className={`${card} flex items-start gap-4`}>
+                  <div className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                    <ArrowDownLeft size={20} className="text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{(data.allTimeCredit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">This month: ₹{(data.monthCredit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Credit</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">₹{(data.allTimeCredit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">This month: <span className="text-emerald-600 dark:text-emerald-400 font-medium">₹{(data.monthCredit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
+                  </div>
                 </div>
-                <div className={`${card} border-l-4 border-red-500`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Debit</span>
-                    <TrendingDown size={16} className="text-red-500" />
+                <div className={`${card} flex items-start gap-4`}>
+                  <div className="w-11 h-11 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                    <ArrowUpRight size={20} className="text-red-500 dark:text-red-400" />
                   </div>
-                  <p className="text-2xl font-bold text-red-500 dark:text-red-400">₹{(data.allTimeDebit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">This month: ₹{(data.monthDebit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Debit</p>
+                    <p className="text-2xl font-bold text-red-500 dark:text-red-400 mt-0.5">₹{(data.allTimeDebit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">This month: <span className="text-red-500 dark:text-red-400 font-medium">₹{(data.monthDebit ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
+                  </div>
                 </div>
-                <div className={`${card} border-l-4 ${balance >= 0 ? 'border-blue-500' : 'border-orange-500'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Balance</span>
-                    <TrendingUp size={16} className={balance >= 0 ? 'text-blue-500' : 'text-orange-500'} />
+                <div className={`${card} flex items-start gap-4`}>
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${balance >= 0 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                    <Wallet size={20} className={balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-500 dark:text-orange-400'} />
                   </div>
-                  <p className={`text-2xl font-bold ${balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-500 dark:text-orange-400'}`}>
-                    ₹{Math.abs(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{balance >= 0 ? 'Credit exceeds debit' : 'Debit exceeds credit'}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Balance</p>
+                    <p className={`text-2xl font-bold mt-0.5 ${balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-500 dark:text-orange-400'}`}>
+                      {balance < 0 && <span className="text-base font-semibold mr-0.5">-</span>}₹{Math.abs(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">{balance >= 0 ? 'Credit exceeds debit' : 'Debit exceeds credit'}</p>
+                  </div>
                 </div>
               </div>
 

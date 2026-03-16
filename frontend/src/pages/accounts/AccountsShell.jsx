@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ChangePasswordModal from '../../components/auth/ChangePasswordModal';
@@ -64,7 +64,7 @@ export default function AccountsShell() {
           {/* Logo */}
           <div className="flex items-center gap-3 px-4 py-5 border-b border-gray-100 dark:border-gray-800">
             <div className="w-9 h-9 bg-violet-600 rounded-xl flex items-center justify-center shrink-0">
-              <CreditCard size={17} className="text-white" />
+              <Landmark size={17} className="text-white" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">Credit & Savings</p>
@@ -100,7 +100,7 @@ export default function AccountsShell() {
 
             <div className="flex items-center gap-2 lg:hidden">
               <div className="w-5 h-5 bg-violet-600 rounded-md flex items-center justify-center">
-                <CreditCard size={11} className="text-white" />
+                <Landmark size={11} className="text-white" />
               </div>
               <span className="text-base font-bold text-gray-900 dark:text-white">Credit & Savings</span>
             </div>
@@ -115,7 +115,7 @@ export default function AccountsShell() {
                 title="Switch workspace"
               >
                 <div className="w-4 h-4 bg-violet-600 rounded-sm flex items-center justify-center shrink-0">
-                  <CreditCard size={9} className="text-white" />
+                  <Landmark size={9} className="text-white" />
                 </div>
                 <span className="hidden sm:inline">Credit & Savings</span>
                 <ArrowLeftRight size={12} />

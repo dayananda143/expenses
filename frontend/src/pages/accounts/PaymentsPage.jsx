@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Trash2, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment, useDeletePayment } from '../../hooks/useAccountPayments';
-import { WS, fmtUSDDecimal, fmtFullDate } from './shared';
+import { WS, fmtUSDDecimal, fmtFullDate, BankLogo } from './shared';
 import ConfirmDialog from '../../components/shared/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -206,9 +206,7 @@ export default function PaymentsPage() {
                   key={p.id}
                   className="flex items-center gap-3 py-3 border-b border-gray-50 dark:border-gray-800 last:border-0 group"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0">
-                    <CreditCard size={14} className="text-rose-600 dark:text-rose-400" />
-                  </div>
+                  <BankLogo name={p.account_name} sizeClass="w-8 h-8" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{p.account_name}</p>
                     {p.notes && <p className="text-xs text-gray-400 truncate">{p.notes}</p>}
