@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info } from 'lucide-react';
+import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
+import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ─── Bank Logo ────────────────────────────────────────────────────────────────
@@ -308,6 +309,8 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
   const isSavings = a.type === 'savings';
+  const [tab, setTab] = useState('details');
+
   const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
   const available = a.credit_limit != null ? a.credit_limit - a.balance : null;
   const mo = promoMonthsLeft(a.promo_apr_end_date);
@@ -316,11 +319,15 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
   const daysUntilDue = dueDate ? daysFromToday(dueDate) : null;
   const promoDays = a.promo_apr_end_date ? daysFromToday(a.promo_apr_end_date) : null;
 
+  const { data: pmtData } = useAccountPayments();
+  const payments = (pmtData?.data ?? []).filter((p) => p.account_id === a.id);
+  const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className={`px-5 py-4 flex items-center justify-between ${isSavings ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
+        <div className={`px-5 py-4 flex items-center justify-between shrink-0 ${isSavings ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
           <div className="flex items-center gap-3">
             <BankLogo name={a.name} sizeClass="w-10 h-10" fallback={isSavings ? (
               <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/40">
@@ -338,7 +345,7 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
         </div>
 
         {/* Balance hero */}
-        <div className="px-5 pt-4 pb-3 text-center border-b border-gray-100 dark:border-gray-800">
+        <div className="px-5 pt-4 pb-3 text-center border-b border-gray-100 dark:border-gray-800 shrink-0">
           <p className={`text-3xl font-black ${isSavings ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
             {fmtUSDDecimal(a.balance)}
           </p>
@@ -356,66 +363,122 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
           )}
         </div>
 
-        {/* Details */}
-        <div className="px-5 py-1">
-          {a.credit_limit && (
-            <DetailRow label="Credit Limit" value={fmtUSDDecimal(a.credit_limit)} valueClass="text-gray-800 dark:text-gray-200" />
-          )}
-          {dueDate && (
-            <DetailRow
-              label="Next Due"
-              value={
-                <span className="flex items-center gap-1.5">
-                  {fmtFullDate(dueDate)}
-                  {daysUntilDue !== null && (
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${
-                      daysUntilDue <= 3 ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
-                      daysUntilDue <= 7 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' :
-                      'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                    }`}>
-                      {daysUntilDue === 0 ? 'today' : daysUntilDue < 0 ? `${Math.abs(daysUntilDue)}d overdue` : `${daysUntilDue}d`}
+        {/* Tabs — only show for credit accounts */}
+        {!isSavings && (
+          <div className="flex border-b border-gray-100 dark:border-gray-800 shrink-0">
+            {[
+              { id: 'details', label: 'Details' },
+              { id: 'history', label: `History${payments.length > 0 ? ` (${payments.length})` : ''}` },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2 -mb-px ${
+                  tab === t.id
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Tab content */}
+        <div className="overflow-y-auto flex-1">
+          {/* Details tab */}
+          {(tab === 'details' || isSavings) && (
+            <div className="px-5 py-1">
+              {a.credit_limit && (
+                <DetailRow label="Credit Limit" value={fmtUSDDecimal(a.credit_limit)} valueClass="text-gray-800 dark:text-gray-200" />
+              )}
+              {dueDate && (
+                <DetailRow
+                  label="Next Due"
+                  value={
+                    <span className="flex items-center gap-1.5">
+                      {fmtFullDate(dueDate)}
+                      {daysUntilDue !== null && (
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${
+                          daysUntilDue <= 3 ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
+                          daysUntilDue <= 7 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' :
+                          'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                        }`}>
+                          {daysUntilDue === 0 ? 'today' : daysUntilDue < 0 ? `${Math.abs(daysUntilDue)}d overdue` : `${daysUntilDue}d`}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              }
-            />
+                  }
+                />
+              )}
+              {a.due_day && (
+                <DetailRow label="Due Day" value={`Day ${a.due_day} of every month`} />
+              )}
+              {a.promo_apr_end_date && promoDays !== null && promoDays >= 0 && (
+                <DetailRow
+                  label="Promo APR Ends"
+                  value={
+                    <span className="flex items-center gap-1.5">
+                      {fmtFullDate(a.promo_apr_end_date)}
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${
+                        promoDays <= 30 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                      }`}>
+                        {promoDays <= 30 ? `${promoDays}d` : `${mo} mo`}
+                      </span>
+                    </span>
+                  }
+                />
+              )}
+              {minPmt !== null && (
+                <DetailRow
+                  label="Min Monthly Payment"
+                  value={`${fmtUSDDecimal(minPmt)}/mo`}
+                  valueClass={mo <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}
+                />
+              )}
+              {a.last_paid_date && (
+                <DetailRow label="Last Paid" value={fmtFullDate(a.last_paid_date)} />
+              )}
+              {a.notes && (
+                <DetailRow label="Notes" value={a.notes} />
+              )}
+              <DetailRow label="Status" value={a.is_active ? 'Active' : 'Inactive'} valueClass={a.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'} />
+            </div>
           )}
-          {a.due_day && (
-            <DetailRow label="Due Day" value={`Day ${a.due_day} of every month`} />
+
+          {/* History tab */}
+          {tab === 'history' && !isSavings && (
+            <div className="px-5 py-3">
+              {payments.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">No payments recorded yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {payments.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 dark:border-gray-800 last:border-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{fmtFullDate(p.date)}</p>
+                        {p.notes && <p className="text-xs text-gray-400 truncate">{p.notes}</p>}
+                      </div>
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtUSDDecimal(p.amount)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-          {a.promo_apr_end_date && promoDays !== null && promoDays >= 0 && (
-            <DetailRow
-              label="Promo APR Ends"
-              value={
-                <span className="flex items-center gap-1.5">
-                  {fmtFullDate(a.promo_apr_end_date)}
-                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${
-                    promoDays <= 30 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
-                  }`}>
-                    {promoDays <= 30 ? `${promoDays}d` : `${mo} mo`}
-                  </span>
-                </span>
-              }
-            />
-          )}
-          {minPmt !== null && (
-            <DetailRow
-              label="Min Monthly Payment"
-              value={`${fmtUSDDecimal(minPmt)}/mo`}
-              valueClass={mo <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}
-            />
-          )}
-          {a.last_paid_date && (
-            <DetailRow label="Last Paid" value={fmtFullDate(a.last_paid_date)} />
-          )}
-          {a.notes && (
-            <DetailRow label="Notes" value={a.notes} />
-          )}
-          <DetailRow label="Status" value={a.is_active ? 'Active' : 'Inactive'} valueClass={a.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'} />
         </div>
 
+        {/* History total footer */}
+        {tab === 'history' && payments.length > 0 && (
+          <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
+            <span>Total paid ({payments.length} payment{payments.length !== 1 ? 's' : ''})</span>
+            <span>{fmtUSDDecimal(totalPaid)}</span>
+          </div>
+        )}
+
         {/* Actions */}
-        <div className="px-5 pb-5 pt-3 flex gap-2">
+        <div className="px-5 pb-5 pt-3 flex gap-2 shrink-0 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={() => { onClose(); onEdit(a); }}
             className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-1.5"
@@ -436,9 +499,65 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
   );
 }
 
+// ─── Payment History Modal ────────────────────────────────────────────────────
+
+export function PaymentHistoryModal({ account, onClose }) {
+  const { data } = useAccountPayments();
+  const all = data?.data ?? [];
+  const payments = all.filter((p) => p.account_id === account.id);
+  const total = payments.reduce((s, p) => s + p.amount, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm shadow-xl flex flex-col max-h-[80vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <BankLogo name={account.name} sizeClass="w-8 h-8" />
+            <div>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">{account.name}</p>
+              <p className="text-xs text-gray-400">Payment History</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* List */}
+        <div className="overflow-y-auto flex-1 px-5 py-3">
+          {payments.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No payments recorded yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 dark:border-gray-800 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{fmtFullDate(p.date)}</p>
+                    {p.notes && <p className="text-xs text-gray-400 truncate">{p.notes}</p>}
+                  </div>
+                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtUSDDecimal(p.amount)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer total */}
+        {payments.length > 0 && (
+          <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
+            <span>Total paid ({payments.length} payment{payments.length !== 1 ? 's' : ''})</span>
+            <span>{fmtUSDDecimal(total)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Account Card ─────────────────────────────────────────────────────────────
 
-export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDrop, onPayment, onView }) {
+export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDrop, onPayment, onView, onHistory }) {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
   const isSavings = a.type === 'savings';
@@ -525,6 +644,14 @@ export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDr
               );
             })()}
             <div className="flex flex-wrap items-center gap-2">
+              {onHistory && (
+                <button
+                  onClick={() => onHistory(a)}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded-lg transition-colors"
+                >
+                  <History size={10} /> History
+                </button>
+              )}
               {onPayment && isAdmin && (
                 <button
                   onClick={() => onPayment(a)}

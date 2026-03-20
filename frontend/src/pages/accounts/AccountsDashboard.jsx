@@ -1,9 +1,88 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X } from 'lucide-react';
 import { useAccounts } from '../../hooks/useAccounts';
-import { useAccountPayments } from '../../hooks/useAccountPayments';
+import { useAccountPayments, useCreatePayment } from '../../hooks/useAccountPayments';
+import { useAuth } from '../../contexts/AuthContext';
 import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal, AccountModal, BankLogo } from './shared';
+
+const inputCls = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors';
+const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide';
+
+function QuickPaymentModal({ account, onClose }) {
+  const create = useCreatePayment();
+  const today = new Date().toLocaleDateString('en-CA');
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    defaultValues: { amount: '', date: today, notes: '' },
+  });
+
+  async function onSubmit(data) {
+    await create.mutateAsync({
+      account_id: account.id,
+      amount: parseFloat(data.amount),
+      date: data.date,
+      notes: data.notes?.trim() || null,
+      workspace: WS,
+    });
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm shadow-xl">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2.5">
+            <BankLogo name={account.name} sizeClass="w-8 h-8" />
+            <div>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">{account.name}</p>
+              <p className="text-xs text-rose-500 font-medium">{fmtUSD(account.balance)} outstanding</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Amount (USD)</label>
+              <input
+                type="number" step="0.01" min="0.01"
+                placeholder="0.00"
+                autoFocus
+                {...register('amount', { required: 'Required', min: { value: 0.01, message: 'Must be > 0' } })}
+                className={inputCls}
+              />
+              {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>}
+            </div>
+            <div>
+              <label className={labelCls}>Date</label>
+              <input type="date" {...register('date', { required: 'Required' })} className={inputCls} />
+              {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date.message}</p>}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Notes (optional)</label>
+            <input {...register('notes')} className={inputCls} placeholder="e.g. Monthly payment" />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {isSubmitting ? 'Recording…' : 'Record Payment'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }) {
   return (
@@ -105,8 +184,11 @@ function AccountsBreakdown({ savings, credits }) {
 }
 
 export default function AccountsDashboard() {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const { data: acctData, isLoading: acctLoading } = useAccounts(WS);
   const { data: pmtData, isLoading: pmtLoading } = useAccountPayments();
+  const [payingAccount, setPayingAccount] = useState(null);
 
   const accounts = acctData?.data ?? [];
   const payments = pmtData?.data ?? [];
@@ -199,18 +281,36 @@ export default function AccountsDashboard() {
           {upcomingDue.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">No payments due in the next 30 days</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {upcomingDue.map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <BankLogo name={a.name} sizeClass="w-7 h-7" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
-                      <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
+                isAdmin ? (
+                  <button
+                    key={a.id}
+                    onClick={() => setPayingAccount(a)}
+                    className="w-full flex items-center justify-between gap-3 px-2 py-2 -mx-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left group"
+                    title="Click to record a payment"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <BankLogo name={a.name} sizeClass="w-7 h-7" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{a.name}</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
+                      </div>
                     </div>
+                    <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
+                  </button>
+                ) : (
+                  <div key={a.id} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <BankLogo name={a.name} sizeClass="w-7 h-7" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
+                      </div>
+                    </div>
+                    <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
                   </div>
-                  <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
-                </div>
+                )
               ))}
             </div>
           )}
@@ -250,6 +350,10 @@ export default function AccountsDashboard() {
       {/* Accounts breakdown */}
       {activeAccounts.length > 0 && (
         <AccountsBreakdown savings={savings} credits={credits} />
+      )}
+
+      {payingAccount && (
+        <QuickPaymentModal account={payingAccount} onClose={() => setPayingAccount(null)} />
       )}
     </div>
   );

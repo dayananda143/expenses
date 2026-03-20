@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAccounts, useDeleteAccount, useReorderAccounts } from '../../hooks/useAccounts';
-import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm } from './shared';
+import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm, PaymentHistoryModal } from './shared';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function CreditCardsPage() {
@@ -16,6 +16,7 @@ export default function CreditCardsPage() {
   const [modal, setModal] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewAccount, setViewAccount] = useState(null);
+  const [historyAccount, setHistoryAccount] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
   const [localOrder, setLocalOrder] = useState(null); // null = use server order
 
@@ -113,6 +114,7 @@ export default function CreditCardsPage() {
               onDrop={handleDrop}
               onPayment={handlePayment}
               onView={setViewAccount}
+              onHistory={setHistoryAccount}
             />
           ))}
         </div>
@@ -147,6 +149,9 @@ export default function CreditCardsPage() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />
+      )}
+      {historyAccount && (
+        <PaymentHistoryModal account={historyAccount} onClose={() => setHistoryAccount(null)} />
       )}
     </div>
   );
