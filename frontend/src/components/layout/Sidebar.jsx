@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -56,6 +56,20 @@ export default function Sidebar({ onClose }) {
             {label}
           </NavLink>
         ))}
+
+        {workspace === 'india' && (
+          <NavLink to="/savings" className={linkClass} onClick={onClose}>
+            <PiggyBank size={16} />
+            Savings
+          </NavLink>
+        )}
+
+        {workspace === 'india' && (
+          <NavLink to="/lic" className={linkClass} onClick={onClose}>
+            <ShieldCheck size={16} />
+            LIC
+          </NavLink>
+        )}
 
         {showHospital && workspace !== 'india' && (
           <NavLink to="/hospital" className={linkClass} onClick={onClose}>

@@ -79,7 +79,7 @@ export default function IndiaLedgerPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">Ledger</h1>
         <p className="text-sm text-gray-400 mt-0.5">Track credits and debits</p>

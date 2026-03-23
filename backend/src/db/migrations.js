@@ -191,6 +191,80 @@ function runMigrations(db) {
     `);
   }
 
+  // Bank FDs (India savings)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bank_fds (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      bank_name        TEXT NOT NULL,
+      fd_number        TEXT DEFAULT NULL,
+      principal_amount REAL NOT NULL CHECK (principal_amount > 0),
+      interest_rate    REAL NOT NULL DEFAULT 0,
+      tenure_months    INTEGER NOT NULL DEFAULT 12,
+      start_date       TEXT NOT NULL,
+      maturity_date    TEXT NOT NULL,
+      maturity_amount  REAL DEFAULT NULL,
+      status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'matured', 'broken')),
+      notes            TEXT DEFAULT NULL,
+      sort_order       INTEGER NOT NULL DEFAULT 0,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_bank_fds_user ON bank_fds(user_id);
+  `);
+
+  try { db.exec("ALTER TABLE bank_fds ADD COLUMN tenure_unit TEXT NOT NULL DEFAULT 'months'"); } catch {}
+
+  // LIC policies (India)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lic_policies (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      lic_number    TEXT NOT NULL,
+      name          TEXT NOT NULL,
+      amount        REAL NOT NULL CHECK (amount > 0),
+      start_date    TEXT NOT NULL,
+      maturity_date TEXT NOT NULL,
+      premium       REAL DEFAULT NULL,
+      notes         TEXT DEFAULT NULL,
+      status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'matured', 'surrendered')),
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_lic_policies_user ON lic_policies(user_id);
+  `);
+  try { db.exec("ALTER TABLE bank_fds ADD COLUMN type TEXT NOT NULL DEFAULT 'fd'"); } catch {}
+
+  // Make start_date, maturity_date, tenure_months nullable (savings type has no dates/tenure)
+  try {
+    db.prepare("INSERT INTO bank_fds (user_id, bank_name, principal_amount, start_date, maturity_date, tenure_months) VALUES (0, '__nullable_test__', 1, NULL, NULL, NULL)").run();
+    db.prepare("DELETE FROM bank_fds WHERE bank_name = '__nullable_test__'").run();
+  } catch {
+    db.exec(`
+      CREATE TABLE bank_fds_v2 (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        bank_name        TEXT NOT NULL,
+        fd_number        TEXT DEFAULT NULL,
+        principal_amount REAL NOT NULL CHECK (principal_amount > 0),
+        interest_rate    REAL NOT NULL DEFAULT 0,
+        tenure_months    INTEGER DEFAULT NULL,
+        tenure_unit      TEXT NOT NULL DEFAULT 'months',
+        start_date       TEXT DEFAULT NULL,
+        maturity_date    TEXT DEFAULT NULL,
+        maturity_amount  REAL DEFAULT NULL,
+        type             TEXT NOT NULL DEFAULT 'fd',
+        status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'matured', 'broken')),
+        notes            TEXT DEFAULT NULL,
+        sort_order       INTEGER NOT NULL DEFAULT 0,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO bank_fds_v2 SELECT id, user_id, bank_name, fd_number, principal_amount, interest_rate, tenure_months, COALESCE(tenure_unit,'months'), start_date, maturity_date, maturity_amount, COALESCE(type,'fd'), status, notes, sort_order, created_at FROM bank_fds;
+      DROP TABLE bank_fds;
+      ALTER TABLE bank_fds_v2 RENAME TO bank_fds;
+      CREATE INDEX IF NOT EXISTS idx_bank_fds_user ON bank_fds(user_id);
+    `);
+  }
+
   // Account payments
   db.exec(`
     CREATE TABLE IF NOT EXISTS account_payments (

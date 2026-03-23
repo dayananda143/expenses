@@ -12,6 +12,8 @@ import PaymentsPage from './pages/accounts/PaymentsPage';
 import DashboardPage from './pages/DashboardPage';
 import ExpensesPage from './pages/ExpensesPage';
 import IndiaLedgerPage from './pages/IndiaLedgerPage';
+import IndiaSavingsPage from './pages/IndiaSavingsPage';
+import LICPage from './pages/LICPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BudgetsPage from './pages/BudgetsPage';
 import UsersPage from './pages/UsersPage';
@@ -56,6 +58,8 @@ export default function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard"  element={<DashboardPage />} />
             <Route path="expenses"   element={<ExpensesRoute />} />
+            <Route path="savings"    element={<IndiaSavingsPage />} />
+            <Route path="lic"        element={<LICPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="budgets"    element={<BudgetsPage />} />
             <Route path="hospital"   element={<HospitalRoute />} />

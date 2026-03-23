@@ -68,7 +68,7 @@ export default function CreditCardsPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>

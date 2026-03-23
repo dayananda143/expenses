@@ -226,7 +226,7 @@ export default function AccountsDashboard() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
