@@ -80,6 +80,7 @@ export default function DashboardPage() {
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [activeIdx, setActiveIdx] = useState(null);
 
   function handleMonthChange(y, m) { setYear(y); setMonth(m); }
 
@@ -222,86 +223,134 @@ export default function DashboardPage() {
           total: m.total,
         }));
 
-        // Month-over-month helpers
-        const prevMonth = month === 1 ? 12 : month - 1;
-        const prevYear  = month === 1 ? year - 1 : year;
-        const vsPrev = data.prevMonthTotal > 0
-          ? Math.round(((data.monthTotal - data.prevMonthTotal) / data.prevMonthTotal) * 100)
-          : null;
-        const vsLastYear = data.sameMonthLastYearTotal > 0
-          ? Math.round(((data.monthTotal - data.sameMonthLastYearTotal) / data.sameMonthLastYearTotal) * 100)
-          : null;
-
         return (
           <>
-            {/* Summary cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className={card}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                    {MONTH_NAMES[month - 1]} {year}
-                  </span>
-                  <TrendingDown size={18} className="text-emerald-600" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmtRound(monthTotal)}</p>
-                <div className="flex items-center gap-3 mt-1.5">
-                  {vsPrev !== null && (
-                    <span className={`text-xs font-medium flex items-center gap-0.5 ${vsPrev > 0 ? 'text-red-500' : vsPrev < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
-                      {vsPrev > 0 ? <TrendingUp size={11} /> : vsPrev < 0 ? <TrendingDown size={11} /> : null}
-                      {vsPrev > 0 ? '+' : ''}{vsPrev}% vs {MONTH_NAMES[prevMonth - 1]}
-                    </span>
-                  )}
-                  {vsLastYear !== null && (
-                    <span className={`text-xs font-medium flex items-center gap-0.5 ${vsLastYear > 0 ? 'text-red-500' : vsLastYear < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
-                      {vsLastYear > 0 ? <TrendingUp size={11} /> : vsLastYear < 0 ? <TrendingDown size={11} /> : null}
-                      {vsLastYear > 0 ? '+' : ''}{vsLastYear}% vs {MONTH_NAMES[month - 1]} {prevYear}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className={card}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Full Year {year}</span>
-                  <TrendingUp size={18} className="text-blue-500" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmtRound(yearTotal)}</p>
-                {data.monthTotal > 0 && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">
-                    Avg {fmtRound(Math.round(yearTotal / month))} / month this year
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Spending insights */}
-            {data.insights?.length > 0 && (
-              <div className={card}>
-                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Spending Insights</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {data.insights.map((ins) => {
-                    const up = ins.changePercent > 0;
-                    return (
-                      <div
-                        key={ins.id}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors"
-                        onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${ins.id}`)}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Monthly trend */}
+              {monthlyData.length > 0 && (
+                <div className={card}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Monthly Spending</h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Click a bar to view expenses</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={monthlyData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} />
+                      <YAxis tick={{ fontSize: 11, fill: tickColor }} tickFormatter={(v) => fmtRound(v)} width={60} />
+                      <Tooltip
+                        formatter={(v) => [fmtRound(v), 'Spent']}
+                        contentStyle={tooltipStyle}
+                        cursor={{ fill: dark ? '#374151' : '#f3f4f6' }}
+                      />
+                      <Bar
+                        dataKey="total"
+                        radius={[4, 4, 0, 0]}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(data) => {
+                          const [y, m] = data.monthKey.split('-').map(Number);
+                          navigate(`/expenses?month=${m}&year=${y}`);
+                        }}
                       >
-                        {(() => { const I = ICON_MAP[ins.icon] ?? Tag; return <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: ins.color }}><I size={14} /></span>; })()}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{ins.name}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">{fmtRound(ins.thisMonth)} this month</p>
-                        </div>
-                        <div className={`text-xs font-semibold flex items-center gap-0.5 shrink-0 ${up ? 'text-red-500' : 'text-emerald-600'}`}>
-                          {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                          {up ? '+' : ''}{ins.changePercent}%
-                          <span className="text-gray-400 font-normal ml-0.5">vs 3-mo avg</span>
+                        {monthlyData.map((entry) => (
+                          <Cell
+                            key={entry.monthKey}
+                            fill={entry.monthKey === selectedMonthKey ? '#059669' : '#10b981'}
+                            opacity={entry.monthKey === selectedMonthKey ? 1 : 0.6}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* By category */}
+              {catData.length > 0 && (() => {
+                const catTotal = catData.reduce((s, c) => s + c.total, 0);
+                const active = activeIdx !== null ? catData[activeIdx] : null;
+                return (
+                  <div className={card}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        {MONTH_NAMES[month - 1]} by Category
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Hover to explore</span>
+                    </div>
+                    <div className="flex gap-5 items-center">
+                      {/* Donut */}
+                      <div className="relative shrink-0 w-36 h-36">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={catData}
+                              dataKey="total"
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={42}
+                              outerRadius={62}
+                              paddingAngle={2}
+                              strokeWidth={0}
+                              onMouseEnter={(_, i) => setActiveIdx(i)}
+                              onMouseLeave={() => setActiveIdx(null)}
+                            >
+                              {catData.map((entry, i) => (
+                                <Cell
+                                  key={entry.id}
+                                  fill={entry.color}
+                                  opacity={activeIdx === null || activeIdx === i ? 1 : 0.2}
+                                  style={{ cursor: 'pointer', transition: 'opacity 0.15s' }}
+                                  onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                                />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        {/* Center label */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-2">
+                          {active ? (
+                            <>
+                              <p className="text-[10px] font-bold text-gray-900 dark:text-white leading-tight truncate max-w-[80px]">{active.name}</p>
+                              <p className="text-sm font-bold leading-tight" style={{ color: active.color }}>
+                                {catTotal > 0 ? Math.round((active.total / catTotal) * 1000) / 10 : 0}%
+                              </p>
+                              <p className="text-[9px] text-gray-400 leading-tight">{fmtRound(active.total)}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-[10px] text-gray-400">Total</p>
+                              <p className="text-sm font-bold text-gray-900 dark:text-white">{fmtRound(catTotal)}</p>
+                            </>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+
+                      {/* Legend — 2-column chip grid */}
+                      <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-1 max-h-36 overflow-y-auto">
+                        {catData.map((entry, i) => {
+                          const dimmed = activeIdx !== null && activeIdx !== i;
+                          return (
+                            <div
+                              key={entry.id}
+                              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer min-w-0"
+                              style={{ opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.15s' }}
+                              onMouseEnter={() => setActiveIdx(i)}
+                              onMouseLeave={() => setActiveIdx(null)}
+                              onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                            >
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: entry.color }} />
+                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{entry.name}</span>
+                              <span className="text-[10px] text-gray-400 ml-auto shrink-0">
+                                {catTotal > 0 ? Math.round((entry.total / catTotal) * 1000) / 10 : 0}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
 
             {/* Budget Status */}
             {budgetStatus.length > 0 && (() => {
@@ -377,134 +426,6 @@ export default function DashboardPage() {
               );
             })()}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* Monthly trend */}
-              {monthlyData.length > 0 && (
-                <div className={card}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Monthly Spending</h2>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">Click a bar to view expenses</span>
-                  </div>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={monthlyData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: tickColor }} />
-                      <YAxis tick={{ fontSize: 11, fill: tickColor }} tickFormatter={(v) => fmtRound(v)} width={60} />
-                      <Tooltip
-                        formatter={(v) => [fmtRound(v), 'Spent']}
-                        contentStyle={tooltipStyle}
-                        cursor={{ fill: dark ? '#374151' : '#f3f4f6' }}
-                      />
-                      <Bar
-                        dataKey="total"
-                        radius={[4, 4, 0, 0]}
-                        style={{ cursor: 'pointer' }}
-                        onClick={(data) => {
-                          const [y, m] = data.monthKey.split('-').map(Number);
-                          navigate(`/expenses?month=${m}&year=${y}`);
-                        }}
-                      >
-                        {monthlyData.map((entry) => (
-                          <Cell
-                            key={entry.monthKey}
-                            fill={entry.monthKey === selectedMonthKey ? '#059669' : '#10b981'}
-                            opacity={entry.monthKey === selectedMonthKey ? 1 : 0.6}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* By category */}
-              {catData.length > 0 && (
-                <div className={card}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      {MONTH_NAMES[month - 1]} by Category
-                    </h2>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">Click a slice to filter</span>
-                  </div>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <PieChart>
-                      <Pie
-                        data={catData}
-                        dataKey="total"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={75}
-                      >
-                        {catData.map((entry) => (
-                          <Cell
-                            key={entry.id}
-                            fill={entry.color}
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => fmtRound(v)} contentStyle={tooltipStyle} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="mt-2 flex flex-col gap-1.5 max-h-32 overflow-y-auto">
-                    {catData.map((entry) => {
-                      const I = ICON_MAP[entry.icon] ?? Tag;
-                      return (
-                        <div
-                          key={entry.id}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded px-1 py-0.5"
-                          onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
-                        >
-                          <span className="w-5 h-5 rounded flex items-center justify-center text-white shrink-0" style={{ background: entry.color }}>
-                            {I ? <I size={11} /> : null}
-                          </span>
-                          <span className="text-xs text-gray-600 dark:text-gray-400 flex-1 truncate">{entry.name}</span>
-                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 shrink-0">{fmtRound(entry.total)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Recent expenses */}
-            {recent.length > 0 && (
-              <div className={card}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                    Recent in {MONTH_NAMES[month - 1]}
-                  </h2>
-                  <button
-                    onClick={() => navigate(`/expenses?month=${month}&year=${year}`)}
-                    className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
-                  >
-                    View all
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {recent.map((e) => (
-                    <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
-                      <div className="flex items-center gap-3">
-                        {(() => { const I = ICON_MAP[e.category_icon] ?? Tag; const bg = e.category_color ?? '#6b7280'; return <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: bg }}><I size={14} /></span>; })()}
-                        <div>
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{e.description}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">{e.category_name ?? 'Uncategorised'} · {e.date}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{fmtRound(e.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!isLoading && monthTotal === 0 && recent.length === 0 && (
-              <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
-                No expenses recorded for {MONTH_NAMES[month - 1]} {year}.
-              </div>
-            )}
           </>
         );
       })()}
