@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Trash2, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { useExpenses, useCreateExpense, useDeleteExpense } from '../hooks/useExpenses';
+import { Trash2, Pencil, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense } from '../hooks/useExpenses';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
@@ -33,9 +33,11 @@ export default function IndiaLedgerPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
   const [activeType, setActiveType] = useState('debit');
 
   const create = useCreateExpense();
+  const update = useUpdateExpense();
   const deleteExp = useDeleteExpense();
 
   const params = {
@@ -200,6 +202,12 @@ export default function IndiaLedgerPage() {
                     {e.type === 'credit' ? '+' : '-'}₹{e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <button
+                    onClick={() => setEditTarget(e)}
+                    className="p-1.5 text-gray-300 dark:text-gray-700 hover:text-blue-500 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
                     onClick={() => setDeleteTarget(e)}
                     className="p-1.5 text-gray-300 dark:text-gray-700 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all shrink-0"
                   >
@@ -239,6 +247,85 @@ export default function IndiaLedgerPage() {
           loading={deleteExp.isPending}
         />
       )}
+
+      {editTarget && (
+        <EditModal
+          entry={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSave={async (data) => {
+            try {
+              await update.mutateAsync({ id: editTarget.id, ...data });
+              toast('Entry updated');
+              setEditTarget(null);
+            } catch (err) {
+              toast(err?.error ?? 'Failed to update', 'error');
+            }
+          }}
+          isSaving={update.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditModal({ entry, onClose, onSave, isSaving }) {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: {
+      description: entry.description,
+      amount: entry.amount,
+      date: entry.date,
+      type: entry.type,
+      notes: entry.notes ?? '',
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Edit Entry</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit(onSave)} className="p-5 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Type</label>
+            <select {...register('type')} className={inputCls}>
+              <option value="debit">Debit</option>
+              <option value="credit">Credit</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Description</label>
+            <input {...register('description', { required: 'Required' })} className={inputCls} />
+            {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Amount</label>
+              <input type="number" step="0.01" min="0.01" {...register('amount', { required: 'Required', min: { value: 0.01, message: 'Must be > 0' } })} className={inputCls} />
+              {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Date</label>
+              <input type="date" {...register('date', { required: 'Required' })} className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Notes (optional)</label>
+            <textarea {...register('notes')} rows={2} className={inputCls + ' resize-none'} />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={isSaving} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              {isSaving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

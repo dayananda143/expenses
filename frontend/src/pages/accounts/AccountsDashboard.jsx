@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X } from 'lucide-react';
-import { useAccounts } from '../../hooks/useAccounts';
+import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X, GripVertical } from 'lucide-react';
+import { useAccounts, useReorderAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
 import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal, AccountModal, BankLogo } from './shared';
@@ -103,8 +103,41 @@ function AccountsBreakdown({ savings, credits }) {
   const [tab, setTab] = useState('credit');
   const [viewAccount, setViewAccount] = useState(null);
   const [editAccount, setEditAccount] = useState(null);
-  const list = tab === 'credit' ? credits : savings;
-  const total = list.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const [localOrder, setLocalOrder] = useState(null);
+  const dragId = useRef(null);
+  const reorder = useReorderAccounts(WS);
+
+  const baseList = tab === 'credit' ? credits : savings;
+  const list = localOrder
+    ? localOrder.map((id) => baseList.find((a) => a.id === id)).filter(Boolean)
+    : baseList;
+  const total = baseList.reduce((s, a) => s + (a.balance ?? 0), 0);
+
+  function handleDragStart(id) {
+    dragId.current = id;
+    setLocalOrder(baseList.map((a) => a.id));
+  }
+
+  function handleDragOver(e, id) {
+    e.preventDefault();
+    if (!dragId.current || dragId.current === id) return;
+    setLocalOrder((prev) => {
+      const order = prev ?? baseList.map((a) => a.id);
+      const from = order.indexOf(dragId.current);
+      const to = order.indexOf(id);
+      if (from < 0 || to < 0) return prev;
+      const next = [...order];
+      next.splice(from, 1);
+      next.splice(to, 0, dragId.current);
+      return next;
+    });
+  }
+
+  function handleDrop() {
+    if (localOrder) reorder.mutate(localOrder);
+    dragId.current = null;
+    setLocalOrder(null);
+  }
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
@@ -112,13 +145,13 @@ function AccountsBreakdown({ savings, credits }) {
         <h2 className="text-sm font-bold text-gray-900 dark:text-white">All Active Accounts</h2>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-semibold">
           <button
-            onClick={() => setTab('credit')}
+            onClick={() => { setTab('credit'); setLocalOrder(null); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${tab === 'credit' ? 'bg-rose-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           >
             <CreditCard size={12} /> Credit ({credits.length})
           </button>
           <button
-            onClick={() => setTab('savings')}
+            onClick={() => { setTab('savings'); setLocalOrder(null); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${tab === 'savings' ? 'bg-emerald-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           >
             <PiggyBank size={12} /> Savings ({savings.length})
@@ -135,31 +168,42 @@ function AccountsBreakdown({ savings, credits }) {
               const isSavings = a.type === 'savings';
               const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
               return (
-                <button
+                <div
                   key={a.id}
-                  onClick={() => setViewAccount(a)}
-                  className="w-full flex items-center gap-3 py-2 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl px-2 -mx-2 transition-colors text-left"
+                  draggable
+                  onDragStart={() => handleDragStart(a.id)}
+                  onDragOver={(e) => handleDragOver(e, a.id)}
+                  onDrop={handleDrop}
+                  className="flex items-center gap-2 py-2 border-b border-gray-50 dark:border-gray-800 last:border-0 group"
                 >
-                  <BankLogo name={a.name} sizeClass="w-8 h-8" fallback={isSavings ? (
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
-                      <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                  ) : undefined} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
-                    {pct !== null && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex-1 h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-[11px] text-gray-400 shrink-0">{pct.toFixed(0)}%</span>
-                      </div>
-                    )}
+                  <div className="p-1 text-gray-300 dark:text-gray-700 cursor-grab active:cursor-grabbing shrink-0">
+                    <GripVertical size={13} />
                   </div>
-                  <p className={`text-sm font-bold shrink-0 ${isSavings ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                    {fmtUSD(a.balance)}
-                  </p>
-                </button>
+                  <button
+                    onClick={() => setViewAccount(a)}
+                    className="flex-1 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl px-2 py-0.5 -mx-2 transition-colors text-left min-w-0"
+                  >
+                    <BankLogo name={a.name} sizeClass="w-8 h-8" fallback={isSavings ? (
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                        <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                    ) : undefined} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
+                      {pct !== null && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[11px] text-gray-400 shrink-0">{pct.toFixed(0)}%</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className={`text-sm font-bold shrink-0 ${isSavings ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {fmtUSD(a.balance)}
+                    </p>
+                  </button>
+                </div>
               );
             })}
           </div>
