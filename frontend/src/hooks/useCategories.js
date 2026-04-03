@@ -54,3 +54,45 @@ export function useDeleteCategory() {
     },
   });
 }
+
+export function useCategorySubtypes(categoryId) {
+  const { workspace } = useWorkspace();
+  return useQuery({
+    queryKey: ['category-subtypes', categoryId],
+    queryFn: () => client.get(`/categories/${categoryId}/subtypes`, { params: { workspace } }),
+    enabled: !!categoryId && !!workspace,
+  });
+}
+
+export function useAllSubtypes() {
+  const { workspace } = useWorkspace();
+  return useQuery({
+    queryKey: ['category-subtypes-all', workspace],
+    queryFn: () => client.get('/categories/subtypes/all', { params: { workspace } }),
+    enabled: !!workspace,
+  });
+}
+
+export function useCreateSubtype() {
+  const qc = useQueryClient();
+  const { workspace } = useWorkspace();
+  return useMutation({
+    mutationFn: ({ categoryId, name }) => client.post(`/categories/${categoryId}/subtypes`, { name }, { params: { workspace } }),
+    onSuccess: (_, { categoryId }) => {
+      qc.invalidateQueries({ queryKey: ['category-subtypes', categoryId] });
+      qc.invalidateQueries({ queryKey: ['category-subtypes-all', workspace] });
+    },
+  });
+}
+
+export function useDeleteSubtype() {
+  const qc = useQueryClient();
+  const { workspace } = useWorkspace();
+  return useMutation({
+    mutationFn: ({ categoryId, subtypeId }) => client.delete(`/categories/${categoryId}/subtypes/${subtypeId}`, { params: { workspace } }),
+    onSuccess: (_, { categoryId }) => {
+      qc.invalidateQueries({ queryKey: ['category-subtypes', categoryId] });
+      qc.invalidateQueries({ queryKey: ['category-subtypes-all', workspace] });
+    },
+  });
+}

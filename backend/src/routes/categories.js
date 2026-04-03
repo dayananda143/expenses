@@ -85,4 +85,48 @@ router.delete('/:id', (req, res, next) => {
   }
 });
 
+// GET /api/categories/:id/subtypes
+router.get('/:id/subtypes', (req, res, next) => {
+  try {
+    const rows = db.prepare(
+      'SELECT * FROM category_subtypes WHERE category_id = ? AND user_id = ? ORDER BY sort_order ASC, name ASC'
+    ).all(req.params.id, req.user.id);
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+});
+
+// POST /api/categories/:id/subtypes
+router.post('/:id/subtypes', (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM category_subtypes WHERE category_id = ? AND user_id = ?').get(req.params.id, req.user.id).m;
+    const result = db.prepare(
+      'INSERT INTO category_subtypes (category_id, user_id, name, sort_order) VALUES (?, ?, ?, ?)'
+    ).run(req.params.id, req.user.id, name.trim(), maxOrder + 1);
+    res.status(201).json({ data: db.prepare('SELECT * FROM category_subtypes WHERE id = ?').get(result.lastInsertRowid) });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/categories/:id/subtypes/:sid
+router.delete('/:id/subtypes/:sid', (req, res, next) => {
+  try {
+    db.prepare('DELETE FROM category_subtypes WHERE id = ? AND user_id = ?').run(req.params.sid, req.user.id);
+    res.status(204).send();
+  } catch (err) { next(err); }
+});
+
+// GET /api/categories/subtypes/all  — all subtypes for a workspace (for expense form)
+router.get('/subtypes/all', (req, res, next) => {
+  try {
+    const rows = db.prepare(
+      `SELECT cs.* FROM category_subtypes cs
+       JOIN categories c ON c.id = cs.category_id
+       WHERE cs.user_id = ? AND c.workspace = ?
+       ORDER BY cs.category_id, cs.sort_order ASC, cs.name ASC`
+    ).all(req.user.id, req.workspace);
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

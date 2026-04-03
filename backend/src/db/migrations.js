@@ -265,6 +265,58 @@ function runMigrations(db) {
     `);
   }
 
+  // Category subtypes
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS category_subtypes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_category_subtypes_cat ON category_subtypes(category_id);
+  `);
+  try { db.exec("ALTER TABLE expenses ADD COLUMN subtype TEXT DEFAULT NULL"); } catch {}
+  // Make description nullable (SQLite can't ALTER COLUMN, use a workaround via NULL default)
+  // We handle this at app level — existing NOT NULL constraint is bypassed by passing NULL which SQLite allows for TEXT NOT NULL if we recreate, but we can just leave existing rows and allow NULL from app side via the check below
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS expenses_v2 (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+        amount      REAL NOT NULL CHECK (amount > 0),
+        date        TEXT NOT NULL,
+        description TEXT DEFAULT NULL,
+        notes       TEXT DEFAULT NULL,
+        workspace   TEXT NOT NULL DEFAULT 'us',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        type        TEXT NOT NULL DEFAULT 'debit',
+        is_recurring INTEGER NOT NULL DEFAULT 0,
+        subtype     TEXT DEFAULT NULL
+      );
+    `);
+    const cols = db.prepare("PRAGMA table_info(expenses)").all().map(c => c.name);
+    if (cols.includes('description')) {
+      const info = db.prepare("PRAGMA table_info(expenses)").all().find(c => c.name === 'description');
+      if (info && info.notnull === 1) {
+        db.exec(`
+          INSERT INTO expenses_v2 (id, user_id, category_id, amount, date, description, notes, workspace, created_at, updated_at, type, is_recurring, subtype)
+            SELECT id, user_id, category_id, amount, date, description, notes, workspace, created_at, updated_at, type, is_recurring, subtype FROM expenses;
+          DROP TABLE expenses;
+          ALTER TABLE expenses_v2 RENAME TO expenses;
+          CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id);
+          CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
+          CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+        `);
+      } else {
+        db.exec("DROP TABLE IF EXISTS expenses_v2");
+      }
+    }
+  } catch {}
+
   // Account payments
   db.exec(`
     CREATE TABLE IF NOT EXISTS account_payments (

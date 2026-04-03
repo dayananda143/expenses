@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, ChevronDown, ChevronUp, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt } from 'lucide-react';
 
 const ICON_MAP = {
   'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
@@ -9,7 +9,7 @@ const ICON_MAP = {
   'gamepad-2': Gamepad2, 'dumbbell': Dumbbell, 'baby': Baby, 'gift': Gift,
   'paw-print': PawPrint, 'briefcase': Briefcase, 'smartphone': Smartphone, 'shirt': Shirt,
 };
-import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useReorderCategories } from '../hooks/useCategories';
+import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, useReorderCategories, useCategorySubtypes, useCreateSubtype, useDeleteSubtype } from '../hooks/useCategories';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -118,6 +118,71 @@ function CategoryModal({ category, onClose }) {
   );
 }
 
+function SubtypesPanel({ category }) {
+  const { toast } = useToast();
+  const { data, isLoading } = useCategorySubtypes(category.id);
+  const createSubtype = useCreateSubtype();
+  const deleteSubtype = useDeleteSubtype();
+  const [newName, setNewName] = useState('');
+
+  const subtypes = data?.data ?? [];
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    try {
+      await createSubtype.mutateAsync({ categoryId: category.id, name: newName.trim() });
+      setNewName('');
+    } catch (err) {
+      toast(err?.error ?? 'Failed to add', 'error');
+    }
+  }
+
+  async function handleDelete(s) {
+    try {
+      await deleteSubtype.mutateAsync({ categoryId: category.id, subtypeId: s.id });
+    } catch (err) {
+      toast(err?.error ?? 'Failed to delete', 'error');
+    }
+  }
+
+  return (
+    <div className="px-4 pb-3 pt-1 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Presets for "{category.name}"</p>
+      {isLoading ? (
+        <p className="text-xs text-gray-400">Loading…</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {subtypes.map((s) => (
+            <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300">
+              {s.name}
+              <button onClick={() => handleDelete(s)} className="text-gray-300 hover:text-red-500 transition-colors ml-0.5">
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+          {subtypes.length === 0 && <p className="text-xs text-gray-400">No presets yet.</p>}
+        </div>
+      )}
+      <form onSubmit={handleAdd} className="flex gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Add preset (e.g. Harris Teeter)"
+          className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+        <button
+          type="submit"
+          disabled={createSubtype.isPending || !newName.trim()}
+          className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        >
+          Add
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function CategoriesPage() {
   const { toast } = useToast();
   const { data, isLoading, error } = useCategories();
@@ -127,6 +192,7 @@ export default function CategoriesPage() {
   const [editCat, setEditCat] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [ordered, setOrdered] = useState([]);
+  const [expandedId, setExpandedId] = useState(null);
   const dragId = useRef(null);
 
   useEffect(() => { setOrdered(data?.data ?? []); }, [data]);
@@ -183,34 +249,37 @@ export default function CategoriesPage() {
           ) : (
             <div className="divide-y divide-gray-50 dark:divide-gray-800">
               {ordered.map((c) => (
-                <div
-                  key={c.id}
-                  draggable
-                  onDragStart={() => onDragStart(c.id)}
-                  onDragOver={(e) => onDragOver(e, c.id)}
-                  onDrop={onDrop}
-                  className="flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-default"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 shrink-0 touch-none">
-                      <GripVertical size={16} />
+                <div key={c.id} draggable onDragStart={() => onDragStart(c.id)} onDragOver={(e) => onDragOver(e, c.id)} onDrop={onDrop}>
+                  <div className="flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-default">
+                    <div className="flex items-center gap-3">
+                      <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 dark:hover:text-gray-500 shrink-0 touch-none">
+                        <GripVertical size={16} />
+                      </div>
+                      <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: c.color }}>
+                        {ICON_MAP[c.icon] ? (() => { const I = ICON_MAP[c.icon]; return <I size={18} />; })() : <span className="text-xs font-bold">{c.name[0]}</span>}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{c.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">{c.icon}</p>
+                      </div>
                     </div>
-                    <span className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0" style={{ background: c.color }}>
-                      {ICON_MAP[c.icon] ? (() => { const I = ICON_MAP[c.icon]; return <I size={18} />; })() : <span className="text-xs font-bold">{c.name[0]}</span>}
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{c.name}</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">{c.icon}</p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                        className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        title="Manage presets"
+                      >
+                        {expandedId === c.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                      <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => setDeleteTarget(c)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => setDeleteTarget(c)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                  {expandedId === c.id && <SubtypesPanel category={c} />}
                 </div>
               ))}
             </div>

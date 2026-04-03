@@ -12,7 +12,7 @@ const ICON_MAP = {
 };
 import Papa from 'papaparse';
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring } from '../hooks/useExpenses';
-import { useCategories } from '../hooks/useCategories';
+import { useCategories, useAllSubtypes } from '../hooks/useCategories';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -66,21 +66,25 @@ function SortIcon({ field, sort, order }) {
     : <ChevronDown size={13} className="text-emerald-500" />;
 }
 
-function ExpenseModal({ expense, categories, onClose }) {
+function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
   const { toast } = useToast();
   const create = useCreateExpense();
   const update = useUpdateExpense();
   const isEdit = !!expense?.id;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     defaultValues: expense
-      ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', notes: expense.notes ?? '', is_recurring: !!expense.is_recurring }
-      : { date: new Date().toLocaleDateString('en-CA'), is_recurring: false },
+      ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', subtype: expense.subtype ?? '', notes: expense.notes ?? '', is_recurring: !!expense.is_recurring }
+      : { date: new Date().toLocaleDateString('en-CA'), is_recurring: false, subtype: '' },
   });
+
+  const selectedCategoryId = watch('category_id');
+  const subtypes = selectedCategoryId ? (subtypesByCategory[String(selectedCategoryId)] ?? []) : [];
+  const datalistId = `subtypes-${selectedCategoryId}`;
 
   async function onSubmit(data) {
     try {
-      const payload = { ...data, amount: parseFloat(data.amount), category_id: data.category_id || null, is_recurring: data.is_recurring ? 1 : 0 };
+      const payload = { ...data, amount: parseFloat(data.amount), category_id: data.category_id || null, subtype: data.subtype?.trim() || null, is_recurring: data.is_recurring ? 1 : 0 };
       if (isEdit) { await update.mutateAsync({ id: expense.id, ...payload }); toast('Expense updated'); }
       else        { await create.mutateAsync(payload); toast('Expense added'); }
       onClose(data.date);
@@ -97,9 +101,30 @@ function ExpenseModal({ expense, categories, onClose }) {
         <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description *</label>
-              <input {...register('description', { required: 'Required' })} className={inputCls} placeholder="e.g. Lunch at restaurant" />
-              {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
+              <select {...register('category_id', { required: 'Category is required' })} className={selectCls}>
+                <option value="">— Select a category —</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {errors.category_id && <p className="text-xs text-red-500 mt-1">{errors.category_id.message}</p>}
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Type / Store
+                <span className="ml-1 text-xs text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                {...register('subtype')}
+                list={datalistId}
+                className={inputCls}
+                placeholder={subtypes.length ? `e.g. ${subtypes[0].name}` : 'Type or store name'}
+                autoComplete="off"
+              />
+              {subtypes.length > 0 && (
+                <datalist id={datalistId}>
+                  {subtypes.map((s) => <option key={s.id} value={s.name} />)}
+                </datalist>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount *</label>
@@ -112,12 +137,8 @@ function ExpenseModal({ expense, categories, onClose }) {
               {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date.message}</p>}
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
-              <select {...register('category_id', { required: 'Category is required' })} className={selectCls}>
-                <option value="">— Select a category —</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              {errors.category_id && <p className="text-xs text-red-500 mt-1">{errors.category_id.message}</p>}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description <span className="text-xs text-gray-400 font-normal">(optional)</span></label>
+              <input {...register('description')} className={inputCls} placeholder="e.g. Lunch at restaurant" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
@@ -178,6 +199,16 @@ export default function ExpensesPage() {
   const applyRecurring = useApplyRecurring();
 
   const { data: catData } = useCategories();
+  const { data: subtypesData } = useAllSubtypes();
+  const subtypesByCategory = useMemo(() => {
+    const map = {};
+    for (const s of subtypesData?.data ?? []) {
+      const key = String(s.category_id);
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    }
+    return map;
+  }, [subtypesData]);
   const categories = catData?.data ?? [];
 
   // Build params — month mode OR date range mode
@@ -380,10 +411,11 @@ export default function ExpensesPage() {
                       <th className={thCls('date')} onClick={() => handleSort('date')}>
                         <span className="flex items-center gap-1">Date <SortIcon field="date" sort={sort} order={order} /></span>
                       </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Type / Store</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Category</th>
                       <th className={thCls('description')} onClick={() => handleSort('description')}>
                         <span className="flex items-center gap-1">Description <SortIcon field="description" sort={sort} order={order} /></span>
                       </th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Category</th>
                       <th className={thCls('amount')} onClick={() => handleSort('amount')}>
                         <span className="flex items-center gap-1 justify-end">Amount <SortIcon field="amount" sort={sort} order={order} /></span>
                       </th>
@@ -395,15 +427,9 @@ export default function ExpensesPage() {
                       <tr key={e.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{e.date}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-800 dark:text-gray-200">{e.description}</p>
-                            {!!e.is_recurring && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" title="Recurring template">
-                                <RefreshCw size={10} /> recurring
-                              </span>
-                            )}
-                          </div>
-                          {e.notes && <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">{e.notes}</p>}
+                          {e.subtype
+                            ? <span className="inline-block text-xs text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-900/20 rounded px-1.5 py-0.5">{e.subtype}</span>
+                            : <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>}
                         </td>
                         <td className="px-4 py-3">
                           {e.category_name ? (
@@ -414,6 +440,17 @@ export default function ExpensesPage() {
                           ) : (
                             <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-800 dark:text-gray-200">{e.description || '—'}</p>
+                            {!!e.is_recurring && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" title="Recurring template">
+                                <RefreshCw size={10} /> recurring
+                              </span>
+                            )}
+                          </div>
+                          {e.notes && <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs mt-0.5">{e.notes}</p>}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{fmt(e.amount)}</td>
                         {isAdmin && (
@@ -482,7 +519,7 @@ export default function ExpensesPage() {
       )}
 
       {showModal && (
-        <ExpenseModal expense={editExpense} categories={categories} onClose={(savedDate) => {
+        <ExpenseModal expense={editExpense} categories={categories} subtypesByCategory={subtypesByCategory} onClose={(savedDate) => {
           setShowModal(false);
           setEditExpense(null);
           if (savedDate) {
