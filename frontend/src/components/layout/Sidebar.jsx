@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -75,6 +75,13 @@ export default function Sidebar({ onClose }) {
           <NavLink to="/insights" className={linkClass} onClick={onClose}>
             <Lightbulb size={16} />
             Insights
+          </NavLink>
+        )}
+
+        {workspace !== 'india' && (
+          <NavLink to="/priority" className={linkClass} onClick={onClose}>
+            <ListOrdered size={16} />
+            Priority List
           </NavLink>
         )}
 

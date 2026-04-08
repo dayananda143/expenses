@@ -317,6 +317,22 @@ function runMigrations(db) {
     }
   } catch {}
 
+  // Priority list
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS priority_items (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace   TEXT NOT NULL DEFAULT 'us',
+      name        TEXT NOT NULL,
+      budget      REAL NOT NULL CHECK (budget > 0),
+      saved       REAL NOT NULL DEFAULT 0,
+      notes       TEXT DEFAULT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_priority_items_user ON priority_items(user_id);
+  `);
+
   // Account payments
   db.exec(`
     CREATE TABLE IF NOT EXISTS account_payments (
