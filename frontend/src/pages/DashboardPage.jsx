@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, CircleDollarSign, Tag, ArrowDownLeft, ArrowUpRight, Wallet, Scale } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, CalendarDays, Download, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, CircleDollarSign, Tag, ArrowDownLeft, ArrowUpRight, Wallet, Scale, PiggyBank } from 'lucide-react';
+import { useSavings } from '../hooks/useSavings';
+import { useLent } from '../hooks/useLent';
 
 const ICON_MAP = {
   'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
@@ -103,6 +105,9 @@ export default function DashboardPage() {
     enabled: !!workspace,
   });
 
+  const { data: savingsData } = useSavings();
+  const { data: lentData } = useLent();
+
   const tickColor = dark ? '#9ca3af' : '#6b7280';
   const tooltipStyle = dark
     ? { backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f9fafb' }
@@ -174,6 +179,60 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Savings / FD Summary Cards */}
+              {(() => {
+                const allItems   = savingsData?.data ?? [];
+                if (allItems.length === 0) return null;
+                function estMat(p, r, t, u) {
+                  if (!p || !r || !t) return null;
+                  const yr = u === 'days' ? t / 365 : t / 12;
+                  return p * (1 + (r / 100) * yr);
+                }
+                function fmtC(n) {
+                  if (n == null || isNaN(n)) return '—';
+                  if (n >= 1e7) return '₹' + (n / 1e7).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + 'Cr';
+                  if (n >= 1e5) return '₹' + (n / 1e5).toLocaleString('en-IN', { maximumFractionDigits: 2 }) + 'L';
+                  return '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+                }
+                const activeFDs   = allItems.filter((f) => f.type === 'fd'      && f.status === 'active');
+                const activeBonds = allItems.filter((f) => f.type === 'bonds'   && f.status === 'active');
+                const savAccounts = allItems.filter((f) => f.type === 'savings' && f.status === 'active');
+                const fdPrincipal  = activeFDs.reduce((s, f) => s + (f.principal_amount ?? 0), 0);
+                const fdMaturity   = activeFDs.reduce((s, f) => s + (f.maturity_amount ?? estMat(f.principal_amount, f.interest_rate, f.tenure_months, f.tenure_unit) ?? 0), 0);
+                const fdGain       = fdMaturity - fdPrincipal;
+                const bondFaceVal  = activeBonds.reduce((s, f) => s + (f.principal_amount ?? 0), 0);
+                const bondMaturity = activeBonds.reduce((s, f) => s + (f.maturity_amount ?? estMat(f.principal_amount, f.interest_rate, f.tenure_months, f.tenure_unit) ?? 0), 0);
+                const savBalance      = savAccounts.reduce((s, f) => s + (f.principal_amount ?? 0), 0);
+                const lentOutstanding = (lentData?.data ?? []).filter((i) => i.status !== 'returned').reduce((s, i) => s + i.amount, 0);
+                const totalWealth    = fdMaturity + bondMaturity + savBalance - lentOutstanding;
+                const cards = [
+                  { label: 'FD Invested', value: fmtC(fdPrincipal), sub: fdGain > 0 ? `+${fmtC(fdGain)} gain` : `${activeFDs.length} active`, subColor: 'text-emerald-500', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30', iconColor: 'text-emerald-600 dark:text-emerald-400', Icon: 'Landmark', hash: 'fd' },
+                  { label: 'Bonds', value: fmtC(bondFaceVal), sub: bondMaturity > bondFaceVal ? `+${fmtC(bondMaturity - bondFaceVal)} gain` : `${activeBonds.length} active`, subColor: 'text-amber-500', iconBg: 'bg-amber-100 dark:bg-amber-900/30', iconColor: 'text-amber-600 dark:text-amber-400', Icon: 'ScrollText', hash: 'bonds' },
+                  { label: 'Savings', value: fmtC(savBalance), sub: `${savAccounts.length} account${savAccounts.length !== 1 ? 's' : ''}`, subColor: 'text-gray-400', iconBg: 'bg-violet-100 dark:bg-violet-900/30', iconColor: 'text-violet-600 dark:text-violet-400', Icon: 'PiggyBank', hash: 'savings' },
+                  { label: 'Total Wealth', value: fmtC(totalWealth), sub: 'FD + bonds + savings - lent out', subColor: 'text-gray-400', iconBg: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-600 dark:text-blue-400', Icon: 'Wallet', hash: 'fd' },
+                ];
+                const IconMap = { Landmark: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>, ScrollText: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M15 8h-5"/><path d="M15 12h-5"/></svg>, PiggyBank: ({ className }) => <PiggyBank size={18} className={className} />, Wallet: ({ className }) => <Wallet size={18} className={className} /> };
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {cards.map(({ label, value, sub, subColor, iconBg, iconColor, Icon, hash }) => {
+                      const I = IconMap[Icon];
+                      return (
+                        <div key={label} onClick={() => navigate(`/savings#${hash}`)} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 flex items-start gap-3 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
+                            <I className={iconColor} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
+                            <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 truncate">{value}</p>
+                            {sub && <p className={`text-xs mt-0.5 ${subColor}`}>{sub}</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
               {/* Recent transactions */}
               {recent.length > 0 && (
                 <div className={card}>
@@ -217,6 +276,9 @@ export default function DashboardPage() {
         }
 
         const catData = byCategory.filter((c) => c.total > 0);
+        const weeklyBreakdown = data.weeklyBreakdown ?? [];
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const currentWeek = weeklyBreakdown.find((w) => w.start <= todayStr && todayStr < w.end);
         const monthlyData = monthly.map((m) => ({
           month: format(parseISO(`${m.month}-01`), 'MMM yy'),
           monthKey: m.month,
@@ -351,6 +413,48 @@ export default function DashboardPage() {
                 );
               })()}
             </div>
+
+            {/* Weekly Spending */}
+            {weeklyBreakdown.length > 0 && (
+              <div className={card}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Weekly Spending — {MONTH_NAMES[month - 1]}</h2>
+                  {currentWeek && year === new Date().getFullYear() && month === new Date().getMonth() + 1 && (
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                      This week: {fmtRound(currentWeek.total)}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {weeklyBreakdown.map((w, idx) => {
+                    const isCurrentWeek = currentWeek && w.start === currentWeek.start;
+                    const maxTotal = Math.max(...weeklyBreakdown.map((x) => x.total), 1);
+                    const pct = (w.total / maxTotal) * 100;
+                    const startD = new Date(w.start + 'T00:00:00');
+                    const endD   = new Date(w.end   + 'T00:00:00'); endD.setDate(endD.getDate() - 1);
+                    const fmtD = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    return (
+                      <div key={w.start}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className={`font-medium ${isCurrentWeek ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {isCurrentWeek ? '▶ ' : ''}Week {idx + 1} <span className="font-normal text-gray-400">({fmtD(startD)} – {fmtD(endD)})</span>
+                          </span>
+                          <span className={`font-semibold ${isCurrentWeek ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {fmtRound(w.total)}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${isCurrentWeek ? 'bg-emerald-500' : 'bg-emerald-300 dark:bg-emerald-700'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Budget Status */}
             {budgetStatus.length > 0 && (() => {

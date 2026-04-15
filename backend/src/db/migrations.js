@@ -86,6 +86,7 @@ function runMigrations(db) {
   try { db.exec("ALTER TABLE accounts ADD COLUMN promo_apr_end_date TEXT DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN last_paid_date TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE accounts ADD COLUMN belongs_to_user_id INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL"); } catch {}
   try { db.exec("ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'debit' CHECK(type IN ('debit','credit'))"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN hospital_access INTEGER NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE expenses ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0"); } catch {}
@@ -213,6 +214,7 @@ function runMigrations(db) {
   `);
 
   try { db.exec("ALTER TABLE bank_fds ADD COLUMN tenure_unit TEXT NOT NULL DEFAULT 'months'"); } catch {}
+  try { db.exec("ALTER TABLE bank_fds ADD COLUMN belongs_to_user_id INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL"); } catch {}
 
   // LIC policies (India)
   db.exec(`
@@ -331,6 +333,45 @@ function runMigrations(db) {
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_priority_items_user ON priority_items(user_id);
+  `);
+
+  // Add archived column to priority_items if missing
+  try {
+    db.exec(`ALTER TABLE priority_items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0`);
+  } catch {}
+  try {
+    db.exec(`ALTER TABLE priority_items ADD COLUMN archived_at TEXT DEFAULT NULL`);
+  } catch {}
+
+  // Lent items
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lent_items (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      person     TEXT NOT NULL,
+      amount     REAL NOT NULL CHECK (amount > 0),
+      notes      TEXT DEFAULT NULL,
+      date_lent  TEXT DEFAULT NULL,
+      due_date   TEXT DEFAULT NULL,
+      status     TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_lent_items_user ON lent_items(user_id);
+  `);
+
+  // India list
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS india_list_items (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace  TEXT NOT NULL DEFAULT 'india',
+      name       TEXT NOT NULL,
+      notes      TEXT DEFAULT NULL,
+      type       TEXT NOT NULL DEFAULT 'buy',
+      done       INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_india_list_workspace ON india_list_items(workspace);
   `);
 
   // Account payments

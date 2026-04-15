@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
+import { useLocation, useNavigate as useNav } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import {
   Plus, GripVertical, Pencil, Trash2, X,
   Landmark, TrendingUp, CalendarClock, BadgePercent,
-  PiggyBank, Building2, ArrowRight, Wallet, ScrollText,
+  PiggyBank, Building2, ArrowRight, Wallet, ScrollText, HandCoins, Check, Clock, AlertCircle,
 } from 'lucide-react';
-import { useSavings, useCreateSaving, useUpdateSaving, useDeleteSaving, useReorderSavings } from '../hooks/useSavings';
+import { useSavings, useCreateSaving, useUpdateSaving, useDeleteSaving, useReorderSavings, useSavingsUsers } from '../hooks/useSavings';
+import { useLent, useCreateLentItem, useUpdateLentItem, useDeleteLentItem } from '../hooks/useLent';
 import { useAuth } from '../contexts/AuthContext';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -116,6 +118,11 @@ function FDCard({ fd, onEdit, onDelete, onDragStart, onDragOver, onDrop, isAdmin
             <div className="min-w-0">
               <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate">{fd.bank_name}</p>
               {fd.fd_number && <p className="text-[11px] text-gray-400 mt-0.5">FD# {fd.fd_number}</p>}
+              {fd.belongs_to_username && (
+                <span className="inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  {fd.belongs_to_username}
+                </span>
+              )}
             </div>
             <span className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${status.cls}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
@@ -226,6 +233,11 @@ function SavingsCard({ fd, onEdit, onDelete, onDragStart, onDragOver, onDrop, is
               Inactive
             </span>
           )}
+          {fd.belongs_to_username && (
+            <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+              {fd.belongs_to_username}
+            </span>
+          )}
         </div>
         {fd.fd_number && <p className="text-[11px] text-gray-400 mt-0.5">A/C# {fd.fd_number}</p>}
         {fd.notes && <p className="text-xs text-gray-400 italic mt-0.5 truncate">{fd.notes}</p>}
@@ -290,6 +302,11 @@ function BondCard({ fd, onEdit, onDelete, onDragStart, onDragOver, onDrop, isAdm
             <div className="min-w-0">
               <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate">{fd.bank_name}</p>
               {fd.fd_number && <p className="text-[11px] text-gray-400 mt-0.5">Bond# {fd.fd_number}</p>}
+              {fd.belongs_to_username && (
+                <span className="inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  {fd.belongs_to_username}
+                </span>
+              )}
             </div>
             <span className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${status.cls}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
@@ -371,6 +388,8 @@ function BondCard({ fd, onEdit, onDelete, onDragStart, onDragOver, onDrop, isAdm
 function EntryModal({ entry, defaultType, onClose }) {
   const createFD = useCreateSaving();
   const updateFD = useUpdateSaving();
+  const { data: usersData } = useSavingsUsers();
+  const allUsers = usersData?.data ?? [];
   const isEdit = !!entry;
   const entryType = entry?.type ?? defaultType ?? 'fd';
   const isFD    = entryType === 'fd';
@@ -390,11 +409,13 @@ function EntryModal({ entry, defaultType, onClose }) {
       maturity_amount: entry.maturity_amount ?? '',
       status: entry.status,
       notes: entry.notes ?? '',
+      belongs_to_user_id: entry.belongs_to_user_id ?? '',
     } : {
       status: 'active',
       tenure_months: hasDates ? 12 : '',
       tenure_unit: 'months',
       interest_rate: '',
+      belongs_to_user_id: '',
     },
   });
 
@@ -417,6 +438,7 @@ function EntryModal({ entry, defaultType, onClose }) {
       maturity_date: data.maturity_date || null,
       fd_number: data.fd_number || null,
       notes: data.notes || null,
+      belongs_to_user_id: data.belongs_to_user_id ? parseInt(data.belongs_to_user_id) : null,
     };
     if (isEdit) await updateFD.mutateAsync({ id: entry.id, ...payload });
     else        await createFD.mutateAsync(payload);
@@ -451,6 +473,16 @@ function EntryModal({ entry, defaultType, onClose }) {
               <label className={labelCls}>Bank Name *</label>
               <input {...register('bank_name', { required: true })} className={inputCls} placeholder="e.g. SBI, HDFC, ICICI" autoFocus />
               {errors.bank_name && <p className="text-xs text-red-500 mt-1">Required</p>}
+            </div>
+
+            <div>
+              <label className={labelCls}>Belongs To</label>
+              <select {...register('belongs_to_user_id')} className={inputCls}>
+                <option value="">— Unassigned —</option>
+                {allUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -549,6 +581,150 @@ function EntryModal({ entry, defaultType, onClose }) {
 
 // ── Delete Confirm ─────────────────────────────────────────────────────────────
 
+// ── Lent Modal ─────────────────────────────────────────────────────────────────
+
+const inputClsLent = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500';
+
+function LentModal({ item, onClose, onCreate, onUpdate }) {
+  const isEdit = !!item;
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    defaultValues: item
+      ? { person: item.person, amount: item.amount, notes: item.notes ?? '', date_lent: item.date_lent ?? '', due_date: item.due_date ?? '', status: item.status }
+      : { person: '', amount: '', notes: '', date_lent: new Date().toISOString().slice(0, 10), due_date: '', status: 'pending' },
+  });
+
+  async function onSubmit(data) {
+    const payload = { ...data, amount: parseFloat(data.amount), notes: data.notes || null, due_date: data.due_date || null };
+    if (isEdit) await onUpdate.mutateAsync({ id: item.id, ...payload });
+    else await onCreate.mutateAsync(payload);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-base font-bold text-gray-900 dark:text-white">{isEdit ? 'Edit Lent Entry' : 'Add Lent Entry'}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Person / Name *</label>
+            <input {...register('person', { required: 'Required' })} className={inputClsLent} placeholder="e.g. Ravi, Sunita" autoFocus />
+            {errors.person && <p className="text-xs text-red-500 mt-1">{errors.person.message}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Amount (₹) *</label>
+            <input type="number" step="0.01" min="0.01" {...register('amount', { required: 'Required', min: { value: 0.01, message: 'Must be > 0' } })} className={inputClsLent} placeholder="0.00" />
+            {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Date Lent</label>
+              <input type="date" {...register('date_lent')} className={inputClsLent} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Due Date</label>
+              <input type="date" {...register('due_date')} className={inputClsLent} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Status</label>
+            <select {...register('status')} className={inputClsLent}>
+              <option value="pending">Pending</option>
+              <option value="partial">Partially Returned</option>
+              <option value="returned">Fully Returned</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Notes <span className="text-gray-400 font-normal normal-case">(optional)</span></label>
+            <textarea {...register('notes')} rows={2} className={`${inputClsLent} resize-none`} placeholder="e.g. For wedding expenses" />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="flex-1 bg-rose-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-rose-700 disabled:opacity-50 transition-colors">
+              {isSubmitting ? 'Saving…' : isEdit ? 'Update' : 'Add'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Lent List ──────────────────────────────────────────────────────────────────
+
+function LentList({ items, isAdmin, onEdit, onDelete }) {
+  const STATUS_CONFIG = {
+    pending:  { label: 'Pending',           Icon: Clock,        cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+    partial:  { label: 'Partial',           Icon: AlertCircle,  cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'   },
+    returned: { label: 'Fully Returned',    Icon: Check,        cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  };
+  const pending  = items.filter((i) => i.status !== 'returned');
+  const returned = items.filter((i) => i.status === 'returned');
+  const totalPending = pending.reduce((s, i) => s + i.amount, 0);
+
+  function fmtD(d) {
+    if (!d) return null;
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function renderItem(item) {
+    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pending;
+    const Icon = cfg.Icon;
+    const overdue = item.due_date && item.status !== 'returned' && new Date(item.due_date + 'T00:00:00') < new Date();
+    return (
+      <div key={item.id} className={`bg-white dark:bg-gray-900 rounded-2xl border p-4 flex items-start gap-3 group ${overdue ? 'border-red-200 dark:border-red-800' : 'border-gray-200 dark:border-gray-800'}`}>
+        <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0">
+          <HandCoins size={18} className="text-rose-600 dark:text-rose-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <p className="text-sm font-bold text-gray-900 dark:text-white">{item.person}</p>
+            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${cfg.cls}`}>
+              <Icon size={10} />{cfg.label}
+            </span>
+          </div>
+          <p className="text-xl font-bold text-rose-600 dark:text-rose-400">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-gray-400">
+            {item.date_lent && <span>Lent: {fmtD(item.date_lent)}</span>}
+            {item.due_date  && <span className={overdue ? 'text-red-500 font-semibold' : ''}>Due: {fmtD(item.due_date)}{overdue ? ' (overdue)' : ''}</span>}
+          </div>
+          {item.notes && <p className="text-xs text-gray-400 mt-1 italic">{item.notes}</p>}
+        </div>
+        {isAdmin && (
+          <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button onClick={() => onEdit(item)} className="p-1.5 text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><Pencil size={13} /></button>
+            <button onClick={() => onDelete(item)} className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"><Trash2 size={13} /></button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {pending.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Outstanding ({pending.length})</p>
+            <p className="text-sm font-bold text-rose-600 dark:text-rose-400">₹{totalPending.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{pending.map(renderItem)}</div>
+        </div>
+      )}
+      {returned.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Returned ({returned.length})</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">{returned.map(renderItem)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Delete Confirm ─────────────────────────────────────────────────────────────
+
 function DeleteConfirm({ name, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -576,7 +752,23 @@ export default function IndiaSavingsPage() {
   const deleteEntry = useDeleteSaving();
   const reorder     = useReorderSavings();
 
-  const [tab, setTab]               = useState('fd');
+  const { data: lentData, isLoading: lentLoading } = useLent();
+  const createLent = useCreateLentItem();
+  const updateLent = useUpdateLentItem();
+  const deleteLent = useDeleteLentItem();
+
+  const location = useLocation();
+  const navHash  = useNav();
+  const VALID_TABS = ['fd', 'bonds', 'savings', 'lent'];
+  const hashTab = location.hash.replace('#', '');
+  const tab = VALID_TABS.includes(hashTab) ? hashTab : 'fd';
+  function setTab(t) { navHash(`#${t}`, { replace: true }); setLocalOrder(null); }
+
+  // Redirect bare /savings to /savings#fd
+  if (!VALID_TABS.includes(hashTab)) {
+    navHash('/savings#fd', { replace: true });
+  }
+
   const [modal, setModal]           = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
@@ -586,7 +778,8 @@ export default function IndiaSavingsPage() {
   const fds         = all.filter((f) => (f.type ?? 'fd') === 'fd');
   const bonds       = all.filter((f) => f.type === 'bonds');
   const savAccounts = all.filter((f) => f.type === 'savings');
-  const current     = tab === 'fd' ? fds : tab === 'bonds' ? bonds : savAccounts;
+  const lentItems   = lentData?.data ?? [];
+  const current     = tab === 'fd' ? fds : tab === 'bonds' ? bonds : tab === 'savings' ? savAccounts : lentItems;
 
   const visible = localOrder
     ? localOrder.map((id) => current.find((f) => f.id === id)).filter(Boolean)
@@ -601,7 +794,9 @@ export default function IndiaSavingsPage() {
   const bondFaceVal  = activeBonds.reduce((s, f) => s + (f.principal_amount ?? 0), 0);
   const bondMaturity = activeBonds.reduce((s, f) => s + (f.maturity_amount ?? estimatedMaturity(f.principal_amount, f.interest_rate, f.tenure_months, f.tenure_unit) ?? 0), 0);
   const savBalance   = savAccounts.filter((f) => f.status === 'active').reduce((s, f) => s + (f.principal_amount ?? 0), 0);
-  const totalWealth  = fdMaturity + bondMaturity + savBalance;
+  const lentOutstanding = lentItems.filter((i) => i.status !== 'returned').reduce((s, i) => s + i.amount, 0);
+  const lentCount = lentItems.filter((i) => i.status !== 'returned').length;
+  const totalWealth  = fdMaturity + bondMaturity + savBalance - lentOutstanding;
 
   function handleDragStart(id) {
     dragId.current = id;
@@ -630,16 +825,21 @@ export default function IndiaSavingsPage() {
   }
 
   async function handleDelete() {
-    await deleteEntry.mutateAsync(deleteTarget.id);
+    if (tab === 'lent') {
+      await deleteLent.mutateAsync(deleteTarget.id);
+    } else {
+      await deleteEntry.mutateAsync(deleteTarget.id);
+    }
     setDeleteTarget(null);
   }
 
   const tabCls = (t) =>
     `flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
       tab === t
-        ? t === 'fd'    ? 'bg-emerald-600 text-white'
-        : t === 'bonds' ? 'bg-amber-500 text-white'
-        :                 'bg-violet-600 text-white'
+        ? t === 'fd'      ? 'bg-emerald-600 text-white'
+        : t === 'bonds'   ? 'bg-amber-500 text-white'
+        : t === 'savings' ? 'bg-violet-600 text-white'
+        :                   'bg-rose-600 text-white'
         : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
     }`;
 
@@ -664,13 +864,13 @@ export default function IndiaSavingsPage() {
             onClick={() => setModal('new')}
             className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm shrink-0"
           >
-            <Plus size={15} /> Add {tab === 'fd' ? 'FD' : tab === 'bonds' ? 'Bond' : 'Account'}
+            <Plus size={15} /> Add {tab === 'fd' ? 'FD' : tab === 'bonds' ? 'Bond' : tab === 'savings' ? 'Account' : 'Lent Entry'}
           </button>
         )}
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-none">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 max-w-none">
         <StatCard
           icon={Landmark}
           iconBg="bg-emerald-100 dark:bg-emerald-900/30"
@@ -698,55 +898,74 @@ export default function IndiaSavingsPage() {
           sub={`${savAccounts.filter(f => f.status === 'active').length} account${savAccounts.length !== 1 ? 's' : ''}`}
         />
         <StatCard
+          icon={HandCoins}
+          iconBg="bg-rose-100 dark:bg-rose-900/30"
+          iconColor="text-rose-600 dark:text-rose-400"
+          label="Lent Out"
+          value={lentOutstanding > 0 ? fmtINRCompact(lentOutstanding) : '—'}
+          sub={lentCount > 0 ? `${lentCount} pending` : 'all returned'}
+          subColor={lentCount > 0 ? 'text-rose-500' : 'text-gray-400'}
+        />
+        <StatCard
           icon={Wallet}
           iconBg="bg-blue-100 dark:bg-blue-900/30"
           iconColor="text-blue-600 dark:text-blue-400"
           label="Total Wealth"
           value={fmtINRCompact(totalWealth)}
-          sub="FD + bonds + savings"
+          sub="FD + bonds + savings - lent out"
         />
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
-        <button className={tabCls('fd')} onClick={() => { setTab('fd'); setLocalOrder(null); }}>
+        <button className={tabCls('fd')} onClick={() => setTab('fd')}>
           <Building2 size={13} /> FD
           <span className="bg-white/30 dark:bg-black/20 text-[10px] px-1.5 py-0.5 rounded-full">{fds.length}</span>
         </button>
-        <button className={tabCls('bonds')} onClick={() => { setTab('bonds'); setLocalOrder(null); }}>
+        <button className={tabCls('bonds')} onClick={() => setTab('bonds')}>
           <ScrollText size={13} /> Bonds
           <span className="bg-white/30 dark:bg-black/20 text-[10px] px-1.5 py-0.5 rounded-full">{bonds.length}</span>
         </button>
-        <button className={tabCls('savings')} onClick={() => { setTab('savings'); setLocalOrder(null); }}>
+        <button className={tabCls('savings')} onClick={() => setTab('savings')}>
           <PiggyBank size={13} /> Savings
           <span className="bg-white/30 dark:bg-black/20 text-[10px] px-1.5 py-0.5 rounded-full">{savAccounts.length}</span>
+        </button>
+        <button className={tabCls('lent')} onClick={() => setTab('lent')}>
+          <HandCoins size={13} /> Lent
+          <span className="bg-white/30 dark:bg-black/20 text-[10px] px-1.5 py-0.5 rounded-full">{lentItems.length}</span>
         </button>
       </div>
 
       {/* Empty state */}
       {visible.length === 0 && (
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl text-center py-16">
-          <div className={`w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center ${tab === 'fd' ? 'bg-emerald-50 dark:bg-emerald-900/20' : tab === 'bonds' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-violet-50 dark:bg-violet-900/20'}`}>
-            {tab === 'fd'    ? <Building2   size={22} className="text-emerald-400" />
-           : tab === 'bonds' ? <ScrollText  size={22} className="text-amber-400"   />
-           :                   <PiggyBank   size={22} className="text-violet-400"  />}
+          <div className={`w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center ${tab === 'fd' ? 'bg-emerald-50 dark:bg-emerald-900/20' : tab === 'bonds' ? 'bg-amber-50 dark:bg-amber-900/20' : tab === 'savings' ? 'bg-violet-50 dark:bg-violet-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
+            {tab === 'fd'      ? <Building2  size={22} className="text-emerald-400" />
+           : tab === 'bonds'   ? <ScrollText size={22} className="text-amber-400"   />
+           : tab === 'savings' ? <PiggyBank  size={22} className="text-violet-400"  />
+           :                     <HandCoins  size={22} className="text-rose-400"    />}
           </div>
           <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-            No {tab === 'fd' ? 'FDs' : tab === 'bonds' ? 'bonds' : 'savings accounts'} yet
+            No {tab === 'fd' ? 'FDs' : tab === 'bonds' ? 'bonds' : tab === 'savings' ? 'savings accounts' : 'lent entries'} yet
           </p>
           {isAdmin && (
             <button
               onClick={() => setModal('new')}
               className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
             >
-              + Add your first {tab === 'fd' ? 'FD' : tab === 'bonds' ? 'bond' : 'account'}
+              + Add your first {tab === 'fd' ? 'FD' : tab === 'bonds' ? 'bond' : tab === 'savings' ? 'account' : 'lent entry'}
             </button>
           )}
         </div>
       )}
 
-      {/* List */}
-      {visible.length > 0 && (
+      {/* Lent list */}
+      {tab === 'lent' && lentItems.length > 0 && (
+        <LentList items={lentItems} isAdmin={isAdmin} onCreate={() => setModal('new')} onEdit={(e) => setModal({ lent: e })} onDelete={setDeleteTarget} deleteLent={deleteLent} />
+      )}
+
+      {/* FD / Bonds / Savings list */}
+      {tab !== 'lent' && visible.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {visible.map((entry) =>
             tab === 'fd' ? (
@@ -760,11 +979,13 @@ export default function IndiaSavingsPage() {
         </div>
       )}
 
-      {modal === 'new' && <EntryModal defaultType={tab} onClose={() => setModal(null)} />}
-      {modal && modal !== 'new' && <EntryModal entry={modal.entry} onClose={() => setModal(null)} />}
+      {modal === 'new' && tab !== 'lent' && <EntryModal defaultType={tab} onClose={() => setModal(null)} />}
+      {modal && modal !== 'new' && !modal.lent && <EntryModal entry={modal.entry} onClose={() => setModal(null)} />}
+      {modal === 'new' && tab === 'lent' && <LentModal onClose={() => setModal(null)} onCreate={createLent} />}
+      {modal?.lent && <LentModal item={modal.lent} onClose={() => setModal(null)} onUpdate={updateLent} />}
       {deleteTarget && (
         <DeleteConfirm
-          name={deleteTarget.bank_name}
+          name={deleteTarget.bank_name ?? deleteTarget.person}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

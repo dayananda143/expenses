@@ -227,58 +227,19 @@ function AccountsBreakdown({ savings, credits }) {
   );
 }
 
-export default function AccountsDashboard() {
-  const { user } = useAuth();
-  const isAdmin = !!user?.is_admin;
-  const { data: acctData, isLoading: acctLoading } = useAccounts(WS);
-  const { data: pmtData, isLoading: pmtLoading } = useAccountPayments();
-  const [payingAccount, setPayingAccount] = useState(null);
-
-  const accounts = acctData?.data ?? [];
-  const payments = pmtData?.data ?? [];
-
-  const activeAccounts = accounts.filter((a) => a.is_active !== 0);
-  const savings = activeAccounts.filter((a) => a.type === 'savings');
-  const credits = activeAccounts.filter((a) => a.type === 'credit');
-
-  const totalSavings    = savings.reduce((s, a) => s + (a.balance ?? 0), 0);
+function UserStatSection({ label, accts }) {
+  const savings = accts.filter((a) => a.type === 'savings');
+  const credits = accts.filter((a) => a.type === 'credit');
+  const totalSavings     = savings.reduce((s, a) => s + (a.balance ?? 0), 0);
   const totalOutstanding = credits.reduce((s, a) => s + (a.balance ?? 0), 0);
   const totalCreditLimit = credits.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
-  const totalAvailable  = totalCreditLimit - totalOutstanding;
-  const netWorth        = totalSavings - totalOutstanding;
-
-  const upcomingDue = useMemo(() => {
-    return credits
-      .filter((a) => a.due_day)
-      .map((a) => {
-        const due = nextDueDate(a.due_day, a.last_paid_date);
-        const days = daysFromToday(due);
-        return { ...a, due, days };
-      })
-      .filter((a) => a.days !== null && a.days <= 30)
-      .sort((a, b) => a.days - b.days);
-  }, [credits]);
-
-  const recentPayments = payments.slice(0, 5);
-
-  if (acctLoading || pmtLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const totalAvailable   = totalCreditLimit - totalOutstanding;
+  const netWorth         = totalSavings - totalOutstanding;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Overview of your credit &amp; savings accounts</p>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div>
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{label}</p>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           icon={TrendingUp}
           iconBg={netWorth >= 0 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-red-100 dark:bg-red-900/30'}
@@ -312,6 +273,69 @@ export default function AccountsDashboard() {
           value={fmtUSD(totalAvailable >= 0 ? totalAvailable : 0)}
           sub={totalCreditLimit > 0 ? `of ${fmtUSD(totalCreditLimit)} limit` : 'no credit limit set'}
         />
+      </div>
+    </div>
+  );
+}
+
+export default function AccountsDashboard() {
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
+  const { data: acctData, isLoading: acctLoading } = useAccounts(WS);
+  const { data: pmtData, isLoading: pmtLoading } = useAccountPayments();
+  const [payingAccount, setPayingAccount] = useState(null);
+
+  const accounts = acctData?.data ?? [];
+  const payments = pmtData?.data ?? [];
+
+  const activeAccounts = accounts.filter((a) => a.is_active !== 0);
+
+  // Users that have at least one account assigned
+  const userNames = [...new Set(activeAccounts.map((a) => a.belongs_to_username).filter(Boolean))].sort();
+
+  const allSavings = activeAccounts.filter((a) => a.type === 'savings');
+  const allCredits = activeAccounts.filter((a) => a.type === 'credit');
+
+  const upcomingDue = useMemo(() => {
+    return allCredits
+      .filter((a) => a.due_day)
+      .map((a) => {
+        const due = nextDueDate(a.due_day, a.last_paid_date);
+        const days = daysFromToday(due);
+        return { ...a, due, days };
+      })
+      .filter((a) => a.days !== null && a.days <= 30)
+      .sort((a, b) => a.days - b.days);
+  }, [allCredits]);
+
+  const recentPayments = payments.slice(0, 5);
+
+  if (acctLoading || pmtLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="text-sm text-gray-400 mt-0.5">Overview of your credit &amp; savings accounts</p>
+      </div>
+
+      {/* Stat sections — All + per user */}
+      <div className="space-y-6">
+        <UserStatSection label="All" accts={activeAccounts} />
+        {userNames.map((name) => (
+          <UserStatSection
+            key={name}
+            label={name}
+            accts={activeAccounts.filter((a) => a.belongs_to_username === name)}
+          />
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -393,7 +417,7 @@ export default function AccountsDashboard() {
 
       {/* Accounts breakdown */}
       {activeAccounts.length > 0 && (
-        <AccountsBreakdown savings={savings} credits={credits} />
+        <AccountsBreakdown savings={allSavings} credits={allCredits} />
       )}
 
       {payingAccount && (

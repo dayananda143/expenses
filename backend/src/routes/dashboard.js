@@ -121,14 +121,58 @@ router.get('/', (req, res, next) => {
       LIMIT 5
     `).all(...expUserParams, ws, monthStart, monthEnd);
 
+    // Day-of-week breakdown for selected month
+    const dowRows = db.prepare(`
+      SELECT strftime('%w', date) AS dow, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
+      FROM expenses
+      WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ?
+      GROUP BY dow
+    `).all(...expUserParams, ws, monthStart, monthEnd);
+    const dowBreakdown = [0,1,2,3,4,5,6].map((d) => {
+      const row = dowRows.find((r) => parseInt(r.dow) === d);
+      return { dow: d, total: row?.total ?? 0, cnt: row?.cnt ?? 0 };
+    });
+
+    // Biggest single expense for selected month
+    const biggestExpense = db.prepare(`
+      SELECT e.description, e.amount, e.date, e.subtype, c.name AS category_name, c.color AS category_color
+      FROM expenses e
+      LEFT JOIN categories c ON e.category_id = c.id
+      WHERE ${expEUserWhere} AND e.workspace = ? AND e.date >= ? AND e.date < ?
+      ORDER BY e.amount DESC LIMIT 1
+    `).get(...expUserParams, ws, monthStart, monthEnd) ?? null;
+
+    // Weekly breakdown for selected month (Mon–Sun weeks)
+    const weeklyBreakdown = (() => {
+      const weeks = [];
+      const firstDay = new Date(year, month - 1, 1);
+      const lastDay  = new Date(year, month, 0);
+      // find Monday of the week containing firstDay
+      let cursor = new Date(firstDay);
+      const dow = cursor.getDay(); // 0=Sun
+      cursor.setDate(cursor.getDate() - (dow === 0 ? 6 : dow - 1));
+      while (cursor <= lastDay) {
+        const wStart = new Date(cursor);
+        const wEnd   = new Date(cursor); wEnd.setDate(wEnd.getDate() + 7);
+        const wStartStr = wStart.toISOString().slice(0, 10);
+        const wEndStr   = wEnd.toISOString().slice(0, 10);
+        const total = db.prepare(
+          `SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE ${expUserWhere} AND workspace = ? AND date >= ? AND date < ?`
+        ).get(...expUserParams, ws, wStartStr, wEndStr).total;
+        weeks.push({ start: wStartStr, end: wEndStr, total });
+        cursor.setDate(cursor.getDate() + 7);
+      }
+      return weeks;
+    })();
+
     // Budget status — use current user's budgets but spend from correct expense scope
     const budgets = db.prepare(`
       SELECT b.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
       FROM budgets b
       LEFT JOIN categories c ON b.category_id = c.id
-      WHERE b.user_id = ? AND b.workspace = ?
+      WHERE b.user_id IN (SELECT id FROM users WHERE is_admin = 1) AND b.workspace = ?
       ORDER BY b.sort_order ASC, b.created_at ASC
-    `).all(userId, ws);
+    `).all(ws);
 
     const budgetStatus = budgets.map((b) => {
       const periodStart = b.period === 'monthly' ? monthStart : yearStart;
@@ -158,6 +202,9 @@ router.get('/', (req, res, next) => {
       prevMonthTotal,
       sameMonthLastYearTotal,
       insights,
+      weeklyBreakdown,
+      dowBreakdown,
+      biggestExpense,
     });
   } catch (err) {
     next(err);

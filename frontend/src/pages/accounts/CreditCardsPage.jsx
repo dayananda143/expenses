@@ -18,19 +18,36 @@ export default function CreditCardsPage() {
   const [viewAccount, setViewAccount] = useState(null);
   const [historyAccount, setHistoryAccount] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [localOrder, setLocalOrder] = useState(null); // null = use server order
+  const [localOrder, setLocalOrder] = useState(null);
+  const [userTab, setUserTab] = useState('all');
 
   const dragId = useRef(null);
 
   const allCredit = (data?.data ?? []).filter((a) => a.type === 'credit');
-  const serverVisible = showInactive ? allCredit : allCredit.filter((a) => a.is_active !== 0);
+
+  // Build user tabs from assigned usernames
+  const userNames = [...new Set(allCredit.map((a) => a.belongs_to_username).filter(Boolean))].sort();
+  const hasUnassigned = allCredit.some((a) => !a.belongs_to_username);
+  const showTabs = userNames.length > 0;
+
+  const activeFilter = allCredit.filter((a) => a.is_active !== 0);
+  const userFiltered =
+    userTab === 'all'        ? allCredit :
+    userTab === '__none__'   ? allCredit.filter((a) => !a.belongs_to_username) :
+                               allCredit.filter((a) => a.belongs_to_username === userTab);
+
+  const serverVisible = showInactive ? userFiltered : userFiltered.filter((a) => a.is_active !== 0);
   const visible = localOrder
     ? localOrder.map((id) => serverVisible.find((a) => a.id === id)).filter(Boolean)
     : serverVisible;
-  const hiddenCount = allCredit.length - allCredit.filter((a) => a.is_active !== 0).length;
+  const hiddenCount = userFiltered.length - userFiltered.filter((a) => a.is_active !== 0).length;
 
-  const totalOutstanding = allCredit.filter((a) => a.is_active !== 0).reduce((s, a) => s + (a.balance ?? 0), 0);
-  const totalLimit       = allCredit.filter((a) => a.is_active !== 0).reduce((s, a) => s + (a.credit_limit ?? 0), 0);
+  const tabActive = userTab === 'all' ? activeFilter :
+    userTab === '__none__' ? activeFilter.filter((a) => !a.belongs_to_username) :
+    activeFilter.filter((a) => a.belongs_to_username === userTab);
+
+  const totalOutstanding = tabActive.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const totalLimit       = tabActive.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
 
   function handleDragStart(id) {
     dragId.current = id;
@@ -67,6 +84,13 @@ export default function CreditCardsPage() {
     navigate('/accounts/payments', { state: { preselectedId: account.id } });
   }
 
+  const tabCls = (active) =>
+    `px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
+      active
+        ? 'bg-violet-600 text-white shadow-sm'
+        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
+    }`;
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -88,6 +112,23 @@ export default function CreditCardsPage() {
         )}
       </div>
 
+      {/* User tabs */}
+      {showTabs && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <button className={tabCls(userTab === 'all')} onClick={() => setUserTab('all')}>All</button>
+          {userNames.map((name) => (
+            <button key={name} className={tabCls(userTab === name)} onClick={() => setUserTab(name)}>
+              {name}
+            </button>
+          ))}
+          {hasUnassigned && (
+            <button className={tabCls(userTab === '__none__')} onClick={() => setUserTab('__none__')}>
+              Unassigned
+            </button>
+          )}
+        </div>
+      )}
+
       {isLoading && (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -96,8 +137,8 @@ export default function CreditCardsPage() {
 
       {!isLoading && visible.length === 0 && (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-sm">No credit cards yet.</p>
-          <p className="text-xs mt-1">Click &ldquo;Add Card&rdquo; to get started.</p>
+          <p className="text-sm">No credit cards{userTab !== 'all' ? ' for this user' : ''} yet.</p>
+          {userTab === 'all' && <p className="text-xs mt-1">Click &ldquo;Add Card&rdquo; to get started.</p>}
         </div>
       )}
 

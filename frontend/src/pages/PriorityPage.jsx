@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, Target } from 'lucide-react';
-import { usePriority, useCreatePriorityItem, useUpdatePriorityItem, useDeletePriorityItem, useReorderPriority } from '../hooks/usePriority';
+import { Plus, Pencil, Trash2, X, GripVertical, Target, Archive, ArchiveX, ChevronDown, ChevronUp } from 'lucide-react';
+import { usePriority, useCreatePriorityItem, useUpdatePriorityItem, useDeletePriorityItem, useReorderPriority, useArchivePriorityItem } from '../hooks/usePriority';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import { useToast } from '../contexts/ToastContext';
@@ -71,26 +71,114 @@ function ItemModal({ item, onClose }) {
   );
 }
 
+function PriorityCard({ item, idx, onEdit, onDelete, onArchive, onDragStart, onDragOver, onDrop, fmt, isArchived }) {
+  const pct = Math.min((item.saved / item.budget) * 100, 100);
+  const remaining = item.budget - item.saved;
+  const done = item.saved >= item.budget;
+
+  return (
+    <div
+      draggable={!isArchived}
+      onDragStart={() => !isArchived && onDragStart(item.id)}
+      onDragOver={(e) => !isArchived && onDragOver(e, item.id)}
+      onDrop={() => !isArchived && onDrop()}
+      className={`bg-white dark:bg-gray-900 rounded-xl border p-4 flex gap-3 group transition-opacity ${
+        isArchived ? 'border-gray-100 dark:border-gray-800 opacity-70' : 'border-gray-200 dark:border-gray-700'
+      }`}
+    >
+      {/* Drag handle + rank */}
+      <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+        {!isArchived && (
+          <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400">
+            <GripVertical size={16} />
+          </div>
+        )}
+        {isArchived
+          ? <Archive size={14} className="text-gray-300 dark:text-gray-600" />
+          : <span className="text-xs font-bold text-gray-300 dark:text-gray-600">#{idx + 1}</span>
+        }
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0">
+            <p className={`text-sm font-bold truncate ${isArchived ? 'text-gray-500 dark:text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{item.name}</p>
+            {item.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{item.notes}</p>}
+            {isArchived && item.archived_at && (
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Archived {new Date(item.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => onArchive(item)}
+              title={isArchived ? 'Unarchive' : 'Archive'}
+              className="p-1.5 text-gray-400 hover:text-violet-600 rounded-md hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+            >
+              {isArchived ? <ArchiveX size={13} /> : <Archive size={13} />}
+            </button>
+            {!isArchived && (
+              <button onClick={() => onEdit(item)} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+                <Pencil size={13} />
+              </button>
+            )}
+            <button onClick={() => onDelete(item)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
+          <div
+            className={`h-full rounded-full transition-all ${done ? 'bg-emerald-500' : pct > 66 ? 'bg-emerald-400' : pct > 33 ? 'bg-amber-400' : 'bg-blue-400'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        {/* Amounts */}
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500 dark:text-gray-400">
+            <span className="font-semibold text-gray-800 dark:text-gray-200">{fmt(item.saved)}</span> saved of {fmt(item.budget)}
+          </span>
+          {done
+            ? <span className="font-semibold text-emerald-600 dark:text-emerald-400">Completed!</span>
+            : <span className="text-gray-400">{fmt(remaining)} to go · {pct.toFixed(0)}%</span>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PriorityPage() {
   const { toast } = useToast();
   const { fmt } = useWorkspace();
   const { data, isLoading } = usePriority();
   const deleteItem = useDeletePriorityItem();
+  const archiveItem = useArchivePriorityItem();
   const reorder = useReorderPriority();
 
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
   const dragId = useRef(null);
 
-  const serverItems = data?.data ?? [];
+  const allItems    = data?.data ?? [];
+  const activeItems = allItems.filter((i) => !i.archived);
+  const archivedItems = allItems.filter((i) => i.archived);
+
+  const serverItems = activeItems;
   const items = localOrder
     ? localOrder.map((id) => serverItems.find((i) => i.id === id)).filter(Boolean)
     : serverItems;
 
-  const totalBudget = serverItems.reduce((s, i) => s + i.budget, 0);
-  const totalSaved  = serverItems.reduce((s, i) => s + i.saved, 0);
+  const totalBudget = activeItems.reduce((s, i) => s + i.budget, 0);
+  const totalSaved  = activeItems.reduce((s, i) => s + i.saved, 0);
 
   function handleDragStart(id) {
     dragId.current = id;
@@ -126,6 +214,13 @@ export default function PriorityPage() {
     } catch (err) { toast(err?.error ?? 'Failed to delete', 'error'); }
   }
 
+  async function handleArchive(item) {
+    try {
+      await archiveItem.mutateAsync(item.id);
+      toast(item.archived ? 'Item unarchived' : 'Item archived');
+    } catch (err) { toast(err?.error ?? 'Failed to archive', 'error'); }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -142,7 +237,7 @@ export default function PriorityPage() {
       </div>
 
       {/* Summary */}
-      {serverItems.length > 0 && (
+      {activeItems.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Target</p>
@@ -158,7 +253,7 @@ export default function PriorityPage() {
 
       {isLoading && <LoadingSpinner />}
 
-      {!isLoading && items.length === 0 && (
+      {!isLoading && activeItems.length === 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 py-16 text-center">
           <Target size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
           <p className="text-sm text-gray-400">No priority items yet.</p>
@@ -166,68 +261,57 @@ export default function PriorityPage() {
         </div>
       )}
 
+      {/* Active items */}
       {!isLoading && items.length > 0 && (
         <div className="space-y-3">
-          {items.map((item, idx) => {
-            const pct = Math.min((item.saved / item.budget) * 100, 100);
-            const remaining = item.budget - item.saved;
-            const done = item.saved >= item.budget;
-            return (
-              <div
-                key={item.id}
-                draggable
-                onDragStart={() => handleDragStart(item.id)}
-                onDragOver={(e) => handleDragOver(e, item.id)}
-                onDrop={handleDrop}
-                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex gap-3 group"
-              >
-                {/* Drag handle + rank */}
-                <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
-                  <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400">
-                    <GripVertical size={16} />
-                  </div>
-                  <span className="text-xs font-bold text-gray-300 dark:text-gray-600">#{idx + 1}</span>
-                </div>
+          {items.map((item, idx) => (
+            <PriorityCard
+              key={item.id}
+              item={item}
+              idx={idx}
+              fmt={fmt}
+              isArchived={false}
+              onEdit={(i) => { setEditItem(i); setShowModal(true); }}
+              onDelete={setDeleteTarget}
+              onArchive={handleArchive}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            />
+          ))}
+        </div>
+      )}
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
-                      {item.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{item.notes}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setEditItem(item); setShowModal(true); }} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
-                        <Pencil size={13} />
-                      </button>
-                      <button onClick={() => setDeleteTarget(item)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden mb-2">
-                    <div
-                      className={`h-full rounded-full transition-all ${done ? 'bg-emerald-500' : pct > 66 ? 'bg-emerald-400' : pct > 33 ? 'bg-amber-400' : 'bg-blue-400'}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-
-                  {/* Amounts */}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      <span className="font-semibold text-gray-800 dark:text-gray-200">{fmt(item.saved)}</span> saved of {fmt(item.budget)}
-                    </span>
-                    {done
-                      ? <span className="font-semibold text-emerald-600 dark:text-emerald-400">Completed!</span>
-                      : <span className="text-gray-400">{fmt(remaining)} to go · {pct.toFixed(0)}%</span>
-                    }
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      {/* Archived section */}
+      {!isLoading && archivedItems.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            {showArchived ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <Archive size={13} />
+            Archived ({archivedItems.length})
+          </button>
+          {showArchived && (
+            <div className="space-y-3 mt-3">
+              {archivedItems.map((item) => (
+                <PriorityCard
+                  key={item.id}
+                  item={item}
+                  idx={0}
+                  fmt={fmt}
+                  isArchived={true}
+                  onEdit={() => {}}
+                  onDelete={setDeleteTarget}
+                  onArchive={handleArchive}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

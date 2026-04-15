@@ -17,6 +17,8 @@ const salaryRouter          = require('./routes/salary');
 const savingsRouter         = require('./routes/savings');
 const licRouter             = require('./routes/lic');
 const priorityRouter        = require('./routes/priority');
+const indiaListRouter       = require('./routes/indiaList');
+const lentRouter            = require('./routes/lent');
 const errorHandler     = require('./middleware/errorHandler');
 const requireAuth      = require('./middleware/auth');
 
@@ -49,6 +51,8 @@ app.use('/api/salary',           salaryRouter);
 app.use('/api/savings',          savingsRouter);
 app.use('/api/lic',              licRouter);
 app.use('/api/priority',         priorityRouter);
+app.use('/api/india-list',       indiaListRouter);
+app.use('/api/lent',             lentRouter);
 app.use(errorHandler);
 
 db.ready.then(() => {

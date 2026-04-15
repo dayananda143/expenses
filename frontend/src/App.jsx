@@ -21,6 +21,7 @@ import BudgetsPage from './pages/BudgetsPage';
 import UsersPage from './pages/UsersPage';
 import HospitalPage from './pages/HospitalPage';
 import SalaryPage from './pages/SalaryPage';
+import IndiaListPage from './pages/IndiaListPage';
 import { useWorkspace } from './contexts/WorkspaceContext';
 import { useAuth } from './contexts/AuthContext';
 
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="budgets"    element={<BudgetsPage />} />
             <Route path="hospital"   element={<HospitalRoute />} />
             <Route path="salary"     element={<SalaryPage />} />
+            <Route path="india-list" element={<IndiaListPage />} />
             <Route element={<AdminRoute />}>
               <Route path="users" element={<UsersPage />} />
             </Route>

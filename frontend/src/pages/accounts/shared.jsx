@@ -6,6 +6,7 @@ import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, T
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSavingsUsers } from '../../hooks/useSavings';
 
 // ─── Bank Logo ────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ const BANK_CONFIGS = [
   { match: /chase/i,               domain: 'chase.com',             bg: 'bg-blue-50 dark:bg-blue-900/20'  },
   { match: /amex|american.?express/i, domain: 'americanexpress.com', bg: 'bg-blue-50 dark:bg-blue-900/20' },
   { match: /discover/i,            domain: 'discover.com',          bg: 'bg-orange-50 dark:bg-orange-900/20' },
-  { match: /capital.?one/i,        domain: 'capitalone.com',        bg: 'bg-red-50 dark:bg-red-900/20'    },
+  { match: /capital.?one/i,        domain: 'www.capitalone.com',    bg: 'bg-red-50 dark:bg-red-900/20'    },
   { match: /bank.?of.?america/i,   domain: 'bankofamerica.com',     bg: 'bg-red-50 dark:bg-red-900/20'    },
   { match: /apple/i,               domain: 'apple.com',             bg: 'bg-gray-50 dark:bg-gray-800'     },
   { match: /paypal/i,              domain: 'paypal.com',            bg: 'bg-blue-50 dark:bg-blue-900/20'  },
@@ -37,6 +38,7 @@ const BANK_CONFIGS = [
   { match: /truist/i,             domain: 'truist.com',            bg: 'bg-purple-50 dark:bg-purple-900/20' },
   { match: /navy.?federal/i,      domain: 'navyfederal.org',       bg: 'bg-blue-50 dark:bg-blue-900/20'  },
   { match: /robinhood/i,          domain: 'robinhood.com',         bg: 'bg-green-50 dark:bg-green-900/20' },
+  { match: /ever.?bank/i,         domain: 'everbank.com',          bg: 'bg-blue-50 dark:bg-blue-900/20'  },
 ];
 
 export function getBankConfig(name) {
@@ -183,6 +185,8 @@ const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 m
 export function AccountModal({ account, defaultType, onClose }) {
   const create = useCreateAccount(WS);
   const update = useUpdateAccount(WS);
+  const { data: usersData } = useSavingsUsers();
+  const allUsers = usersData?.data ?? [];
   const isEdit = !!account;
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
@@ -191,7 +195,8 @@ export function AccountModal({ account, defaultType, onClose }) {
       credit_limit: account.credit_limit ?? '', due_day: account.due_day ?? '',
       promo_apr_end_date: account.promo_apr_end_date ?? '',
       is_active: account.is_active !== 0, notes: account.notes ?? '',
-    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '' },
+      belongs_to_user_id: account.belongs_to_user_id ?? '',
+    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '' },
   });
   const type = watch('type');
   const name = watch('name');
@@ -204,6 +209,7 @@ export function AccountModal({ account, defaultType, onClose }) {
       due_day: data.type === 'credit' && data.due_day ? parseInt(data.due_day) : null,
       promo_apr_end_date: data.type === 'credit' && data.promo_apr_end_date ? data.promo_apr_end_date : null,
       is_active: data.is_active,
+      belongs_to_user_id: data.belongs_to_user_id ? parseInt(data.belongs_to_user_id) : null,
     };
     if (isEdit) await update.mutateAsync({ id: account.id, ...payload });
     else await create.mutateAsync(payload);
@@ -231,6 +237,15 @@ export function AccountModal({ account, defaultType, onClose }) {
             <label className={labelCls}>Account Name</label>
             <input {...register('name', { required: 'Required' })} className={inputCls} placeholder="e.g. Chase Savings, Amex" />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
+          </div>
+          <div>
+            <label className={labelCls}>Belongs To</label>
+            <select {...register('belongs_to_user_id')} className={inputCls}>
+              <option value="">— Unassigned —</option>
+              {allUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.username}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className={labelCls}>Type</label>
@@ -592,6 +607,11 @@ export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDr
                 {!a.is_active && <EyeOff size={11} className="text-gray-400 shrink-0" />}
                 {onView && <Info size={10} className="text-gray-300 dark:text-gray-700 shrink-0" />}
               </div>
+              {a.belongs_to_username && (
+                <span className="inline-block mt-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  {a.belongs_to_username}
+                </span>
+              )}
               {a.notes && <p className="text-xs text-gray-400 truncate">{a.notes}</p>}
             </div>
           </button>

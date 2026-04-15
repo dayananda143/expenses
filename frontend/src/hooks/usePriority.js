@@ -38,6 +38,15 @@ export function useDeletePriorityItem() {
   });
 }
 
+export function useArchivePriorityItem() {
+  const qc = useQueryClient();
+  const { workspace } = useWorkspace();
+  return useMutation({
+    mutationFn: (id) => client.patch(`/priority/${id}/archive`, {}, { params: { workspace } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['priority', workspace] }),
+  });
+}
+
 export function useReorderPriority() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();
