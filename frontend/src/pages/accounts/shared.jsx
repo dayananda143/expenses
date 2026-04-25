@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History } from 'lucide-react';
+import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -572,12 +572,77 @@ export function PaymentHistoryModal({ account, onClose }) {
 
 // ─── Account Card ─────────────────────────────────────────────────────────────
 
-export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDrop, onPayment, onView, onHistory }) {
+export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDragOver, onDrop, onPayment, onView, onHistory }) {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
   const isSavings = a.type === 'savings';
-  const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
+
+  if (isSavings) {
+    return (
+      <div
+        draggable
+        onDragStart={() => onDragStart(a.id)}
+        onDragOver={(e) => onDragOver(e, a.id)}
+        onDrop={onDrop}
+        className={`group relative rounded-2xl border transition-all hover:shadow-md border-emerald-100 dark:border-emerald-900/40 bg-white dark:bg-gray-900 hover:border-emerald-300 dark:hover:border-emerald-700 ${!a.is_active ? 'opacity-60' : ''}`}
+      >
+        <div className="absolute left-0 top-4 bottom-4 w-1 rounded-full bg-emerald-400" />
+        <div className="px-5 py-4 pl-6">
+          <div className="flex items-start justify-between gap-3">
+            <button onClick={() => onView?.(a)} className="flex items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity">
+              <GripVertical size={15} className="text-gray-300 dark:text-gray-700 cursor-grab shrink-0" />
+              <BankLogo name={a.name} sizeClass="w-9 h-9" fallback={
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                  <PiggyBank size={16} className="text-emerald-600 dark:text-emerald-400" />
+                </div>
+              } />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{a.name}</p>
+                  {!a.is_active && <EyeOff size={11} className="text-gray-400 shrink-0" />}
+                  {onView && <Info size={10} className="text-gray-300 dark:text-gray-700 shrink-0" />}
+                </div>
+                {a.belongs_to_username && (
+                  <span className="inline-block mt-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    {a.belongs_to_username}
+                  </span>
+                )}
+                {a.notes && <p className="text-xs text-gray-400 truncate">{a.notes}</p>}
+              </div>
+            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right">
+                <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">{fmtUSD(a.balance)}</p>
+                <p className="text-[11px] text-gray-400">balance</p>
+              </div>
+              <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onArchive && (
+                  <button onClick={() => onArchive(a)} title={a.archived ? 'Unarchive' : 'Archive'} className="p-1.5 text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors">
+                    {a.archived ? <ArchiveX size={12} /> : <Archive size={12} />}
+                  </button>
+                )}
+                {!a.archived && (
+                  <button onClick={() => onEdit(a)} className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                    <Pencil size={12} />
+                  </button>
+                )}
+                <button onClick={() => onDelete(a)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Rich credit card layout ───────────────────────────────────────────────────
+  const pct       = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
   const available = a.credit_limit != null ? a.credit_limit - a.balance : null;
+  const mo        = promoMonthsLeft(a.promo_apr_end_date);
+  const minPmt    = mo && a.balance ? a.balance / mo : null;
+  const urgent    = mo != null && mo <= 3;
 
   return (
     <div
@@ -585,104 +650,124 @@ export function AccountCard({ a, onEdit, onDelete, onDragStart, onDragOver, onDr
       onDragStart={() => onDragStart(a.id)}
       onDragOver={(e) => onDragOver(e, a.id)}
       onDrop={onDrop}
-      className={`group relative rounded-2xl border transition-all hover:shadow-md ${
-        isSavings
-          ? 'border-emerald-100 dark:border-emerald-900/40 bg-white dark:bg-gray-900 hover:border-emerald-300 dark:hover:border-emerald-700'
-          : 'border-rose-100 dark:border-rose-900/40 bg-white dark:bg-gray-900 hover:border-rose-300 dark:hover:border-rose-700'
-      } ${!a.is_active ? 'opacity-60' : ''}`}
+      className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all hover:shadow-md ${!a.is_active ? 'opacity-60' : ''}`}
     >
-      <div className={`absolute left-0 top-4 bottom-4 w-1 rounded-full ${isSavings ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-      <div className="px-5 py-4 pl-6">
-        <div className="flex items-start justify-between gap-3">
-          <button onClick={() => onView?.(a)} className="flex items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity">
-            <GripVertical size={15} className="text-gray-300 dark:text-gray-700 cursor-grab shrink-0" />
-            <BankLogo name={a.name} sizeClass="w-9 h-9" fallback={isSavings ? (
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
-                <PiggyBank size={16} className="text-emerald-600 dark:text-emerald-400" />
-              </div>
-            ) : undefined} />
+      <div className="p-4 flex gap-3 items-start">
+        {/* Drag handle */}
+        <div className="mt-1 cursor-grab text-gray-200 dark:text-gray-700 hover:text-gray-400 shrink-0">
+          <GripVertical size={15} />
+        </div>
+
+        {/* Bank logo */}
+        <BankLogo name={a.name} sizeClass="w-10 h-10" />
+
+        <div className="flex-1 min-w-0">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-2 mb-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{a.name}</p>
-                {!a.is_active && <EyeOff size={11} className="text-gray-400 shrink-0" />}
-                {onView && <Info size={10} className="text-gray-300 dark:text-gray-700 shrink-0" />}
-              </div>
+              <button onClick={() => onView?.(a)} className="text-left hover:opacity-80 transition-opacity">
+                <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate">{a.name}</p>
+              </button>
               {a.belongs_to_username && (
-                <span className="inline-block mt-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                <span className="inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
                   {a.belongs_to_username}
                 </span>
               )}
-              {a.notes && <p className="text-xs text-gray-400 truncate">{a.notes}</p>}
             </div>
-          </button>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="text-right">
-              <p className={`text-base font-bold ${isSavings ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                {fmtUSD(a.balance)}
-              </p>
-              <p className="text-[11px] text-gray-400">{isSavings ? 'balance' : 'outstanding'}</p>
-            </div>
-            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => onEdit(a)} className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                <Pencil size={12} />
-              </button>
-              <button onClick={() => onDelete(a)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                <Trash2 size={12} />
-              </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {!a.is_active && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Inactive</span>
+              )}
+              <div className="flex flex-col gap-1">
+                {onArchive && (
+                  <button onClick={() => onArchive(a)} title={a.archived ? 'Unarchive' : 'Archive'} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    {a.archived ? <ArchiveX size={13} /> : <Archive size={13} />}
+                  </button>
+                )}
+                {!a.archived && (
+                  <button onClick={() => onEdit(a)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <Pencil size={13} />
+                  </button>
+                )}
+                <button onClick={() => onDelete(a)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {!isSavings && (
-          <div className="ml-12 mt-3 space-y-2">
-            {pct !== null && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-gray-400">
-                  <span>{fmtUSD(available)} available</span>
-                  <span className={`font-semibold ${pct > 80 ? 'text-red-500' : pct > 50 ? 'text-amber-500' : 'text-emerald-500'}`}>{pct.toFixed(0)}% used</span>
-                </div>
-                <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
-                </div>
-                <p className="text-[11px] text-gray-400">of {fmtUSD(a.credit_limit)} limit</p>
+          {/* Amount boxes */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="bg-rose-50 dark:bg-rose-900/20 rounded-xl px-3 py-2 flex-1 min-w-0">
+              <p className="text-[10px] text-rose-500 dark:text-rose-400 font-medium uppercase tracking-wide">Outstanding</p>
+              <p className="text-sm font-bold text-rose-700 dark:text-rose-300 mt-0.5">{fmtUSD(a.balance)}</p>
+            </div>
+            {available != null && (
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl px-3 py-2 flex-1 min-w-0">
+                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wide">Available</p>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">{fmtUSD(Math.max(0, available))}</p>
               </div>
             )}
-            <div className="flex flex-wrap items-center gap-2">
-              <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
-              <PromoBadge date={a.promo_apr_end_date} />
-            </div>
-            {(() => {
-              const mo = promoMonthsLeft(a.promo_apr_end_date);
-              if (!mo || !a.balance) return null;
-              const minPmt = a.balance / mo;
-              const urgent = mo <= 3;
-              return (
-                <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg ${urgent ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'}`}>
-                  {urgent && <AlertTriangle size={10} />}
-                  Pay <span className="font-bold">{fmtUSDDecimal(minPmt)}/mo</span> to clear by promo end ({mo} mo left)
-                </div>
-              );
-            })()}
-            <div className="flex flex-wrap items-center gap-2">
-              {onHistory && (
-                <button
-                  onClick={() => onHistory(a)}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded-lg transition-colors"
-                >
-                  <History size={10} /> History
-                </button>
-              )}
-              {onPayment && isAdmin && (
-                <button
-                  onClick={() => onPayment(a)}
-                  className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 px-2.5 py-1 rounded-lg transition-colors"
-                >
-                  Record Payment
-                </button>
-              )}
-            </div>
+            {a.credit_limit && (
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2 min-w-0">
+                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Limit</p>
+                <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mt-0.5">{fmtUSD(a.credit_limit)}</p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Utilization bar */}
+          {pct !== null && (
+            <div className="mb-3">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-400">Utilization</span>
+                <span className={`font-semibold ${pct > 80 ? 'text-red-500' : pct > 50 ? 'text-amber-500' : 'text-emerald-500'}`}>{pct.toFixed(0)}% used</span>
+              </div>
+              <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-gradient-to-r from-red-400 to-red-600' : pct > 50 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-emerald-400 to-emerald-600'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Badges row */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
+            <PromoBadge date={a.promo_apr_end_date} />
+          </div>
+
+          {/* Promo min payment hint */}
+          {minPmt != null && (
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 rounded-lg mb-2 ${urgent ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'}`}>
+              {urgent && <AlertTriangle size={10} />}
+              Pay <span className="font-bold">{fmtUSDDecimal(minPmt)}/mo</span> to clear by promo end ({mo} mo left)
+            </div>
+          )}
+
+          {a.notes && <p className="text-xs text-gray-400 italic mb-2">{a.notes}</p>}
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {onHistory && (
+              <button
+                onClick={() => onHistory(a)}
+                className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                <History size={10} /> History
+              </button>
+            )}
+            {onPayment && isAdmin && (
+              <button
+                onClick={() => onPayment(a)}
+                className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                <DollarSign size={10} /> Record Payment
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -699,6 +784,32 @@ export function DeleteConfirm({ name, onConfirm, onCancel }) {
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl py-2 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
           <button onClick={onConfirm} className="flex-1 bg-red-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-red-700 transition-colors">Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ArchiveConfirm({ name, isArchived, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 w-full max-w-xs text-center space-y-4">
+        <div className="w-11 h-11 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto">
+          {isArchived ? <ArchiveX size={20} className="text-violet-600 dark:text-violet-400" /> : <Archive size={20} className="text-violet-600 dark:text-violet-400" />}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            {isArchived ? 'Unarchive' : 'Archive'} &ldquo;{name}&rdquo;?
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            {isArchived ? 'This account will be restored to the active list.' : 'This account will be hidden from the active list.'}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl py-2 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 bg-violet-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-violet-700 transition-colors">
+            {isArchived ? 'Unarchive' : 'Archive'}
+          </button>
         </div>
       </div>
     </div>

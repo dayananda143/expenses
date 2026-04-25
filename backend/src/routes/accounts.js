@@ -79,6 +79,19 @@ router.put('/:id', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PATCH /api/accounts/:id/archive?workspace=us
+router.patch('/:id/archive', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const account = db.prepare(`SELECT a.* FROM accounts a WHERE a.id = ? AND ${adminUserWhere} AND a.workspace = ?`).get(req.params.id, req.workspace);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    const nowArchived = account.archived ? 0 : 1;
+    db.prepare('UPDATE accounts SET archived = ?, archived_at = ? WHERE id = ?').run(nowArchived, nowArchived ? new Date().toISOString() : null, account.id);
+    const row = db.prepare('SELECT a.*, u.username AS belongs_to_username FROM accounts a LEFT JOIN users u ON u.id = a.belongs_to_user_id WHERE a.id = ?').get(account.id);
+    res.json({ data: row });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/accounts/:id?workspace=us
 router.delete('/:id', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });

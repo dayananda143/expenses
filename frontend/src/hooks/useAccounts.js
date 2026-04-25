@@ -33,6 +33,14 @@ export function useDeleteAccount(workspace) {
   });
 }
 
+export function useArchiveAccount(workspace) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => client.patch(`/accounts/${id}/archive`, {}, { params: { workspace } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['accounts', workspace] }),
+  });
+}
+
 export function useReorderAccounts(workspace) {
   const qc = useQueryClient();
   return useMutation({

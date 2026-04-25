@@ -87,6 +87,8 @@ function runMigrations(db) {
   try { db.exec("ALTER TABLE accounts ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN last_paid_date TEXT DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN belongs_to_user_id INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL"); } catch {}
+  try { db.exec("ALTER TABLE accounts ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE accounts ADD COLUMN archived_at TEXT DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'debit' CHECK(type IN ('debit','credit'))"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN hospital_access INTEGER NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE expenses ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0"); } catch {}

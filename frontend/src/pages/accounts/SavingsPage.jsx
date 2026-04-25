@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { Plus } from 'lucide-react';
-import { useAccounts, useDeleteAccount, useReorderAccounts } from '../../hooks/useAccounts';
-import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm } from './shared';
+import { Plus, ChevronDown, ChevronUp, Archive } from 'lucide-react';
+import { useAccounts, useDeleteAccount, useReorderAccounts, useArchiveAccount } from '../../hooks/useAccounts';
+import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm, ArchiveConfirm } from './shared';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SavingsPage() {
@@ -10,19 +10,23 @@ export default function SavingsPage() {
   const { data, isLoading } = useAccounts(WS);
   const deleteAccount = useDeleteAccount(WS);
   const reorder = useReorderAccounts(WS);
+  const archiveAccount = useArchiveAccount(WS);
 
   const [modal, setModal] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewAccount, setViewAccount] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
   const [userTab, setUserTab] = useState('all');
 
   const dragId = useRef(null);
 
-  const allSavings = (data?.data ?? []).filter((a) => a.type === 'savings');
+  const allSavings = (data?.data ?? []).filter((a) => a.type === 'savings' && !a.archived);
+  const archivedSavings = (data?.data ?? []).filter((a) => a.type === 'savings' && a.archived);
 
-  // Build user tabs from assigned usernames
+  // Build user tabs from assigned usernames (active only)
   const userNames = [...new Set(allSavings.map((a) => a.belongs_to_username).filter(Boolean))].sort();
   const hasUnassigned = allSavings.some((a) => !a.belongs_to_username);
   const showTabs = userNames.length > 0;
@@ -134,13 +138,14 @@ export default function SavingsPage() {
       )}
 
       {!isLoading && visible.length > 0 && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {visible.map((a) => (
             <AccountCard
               key={a.id}
               a={a}
               onEdit={(acc) => setModal({ account: acc })}
               onDelete={setDeleteTarget}
+              onArchive={setArchiveTarget}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
@@ -157,6 +162,36 @@ export default function SavingsPage() {
         >
           {showInactive ? 'Hide inactive' : `Show ${hiddenCount} inactive account${hiddenCount !== 1 ? 's' : ''}`}
         </button>
+      )}
+
+      {/* Archived section */}
+      {archivedSavings.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            {showArchived ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <Archive size={13} />
+            Archived ({archivedSavings.length})
+          </button>
+          {showArchived && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              {archivedSavings.map((a) => (
+                <AccountCard
+                  key={a.id}
+                  a={a}
+                  onEdit={() => {}}
+                  onDelete={setDeleteTarget}
+                  onArchive={setArchiveTarget}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {viewAccount && (
@@ -177,6 +212,14 @@ export default function SavingsPage() {
           name={deleteTarget.name}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+      {archiveTarget && (
+        <ArchiveConfirm
+          name={archiveTarget.name}
+          isArchived={!!archiveTarget.archived}
+          onConfirm={() => { archiveAccount.mutate(archiveTarget.id); setArchiveTarget(null); }}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
     </div>

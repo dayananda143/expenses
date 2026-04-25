@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Archive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAccounts, useDeleteAccount, useReorderAccounts } from '../../hooks/useAccounts';
-import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm, PaymentHistoryModal } from './shared';
+import { useAccounts, useDeleteAccount, useReorderAccounts, useArchiveAccount } from '../../hooks/useAccounts';
+import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm, ArchiveConfirm, PaymentHistoryModal } from './shared';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function CreditCardsPage() {
@@ -11,6 +11,7 @@ export default function CreditCardsPage() {
   const { data, isLoading } = useAccounts(WS);
   const deleteAccount = useDeleteAccount(WS);
   const reorder = useReorderAccounts(WS);
+  const archiveAccount = useArchiveAccount(WS);
   const navigate = useNavigate();
 
   const [modal, setModal] = useState(null);
@@ -18,14 +19,17 @@ export default function CreditCardsPage() {
   const [viewAccount, setViewAccount] = useState(null);
   const [historyAccount, setHistoryAccount] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
   const [userTab, setUserTab] = useState('all');
 
   const dragId = useRef(null);
 
-  const allCredit = (data?.data ?? []).filter((a) => a.type === 'credit');
+  const allCredit = (data?.data ?? []).filter((a) => a.type === 'credit' && !a.archived);
+  const archivedCredit = (data?.data ?? []).filter((a) => a.type === 'credit' && a.archived);
 
-  // Build user tabs from assigned usernames
+  // Build user tabs from assigned usernames (active only)
   const userNames = [...new Set(allCredit.map((a) => a.belongs_to_username).filter(Boolean))].sort();
   const hasUnassigned = allCredit.some((a) => !a.belongs_to_username);
   const showTabs = userNames.length > 0;
@@ -143,13 +147,14 @@ export default function CreditCardsPage() {
       )}
 
       {!isLoading && visible.length > 0 && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {visible.map((a) => (
             <AccountCard
               key={a.id}
               a={a}
               onEdit={(acc) => setModal({ account: acc })}
               onDelete={setDeleteTarget}
+              onArchive={setArchiveTarget}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
@@ -168,6 +173,36 @@ export default function CreditCardsPage() {
         >
           {showInactive ? 'Hide inactive' : `Show ${hiddenCount} inactive card${hiddenCount !== 1 ? 's' : ''}`}
         </button>
+      )}
+
+      {/* Archived section */}
+      {archivedCredit.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            {showArchived ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <Archive size={13} />
+            Archived ({archivedCredit.length})
+          </button>
+          {showArchived && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              {archivedCredit.map((a) => (
+                <AccountCard
+                  key={a.id}
+                  a={a}
+                  onEdit={() => {}}
+                  onDelete={setDeleteTarget}
+                  onArchive={setArchiveTarget}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {viewAccount && (
@@ -189,6 +224,14 @@ export default function CreditCardsPage() {
           name={deleteTarget.name}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+      {archiveTarget && (
+        <ArchiveConfirm
+          name={archiveTarget.name}
+          isArchived={!!archiveTarget.archived}
+          onConfirm={() => { archiveAccount.mutate(archiveTarget.id); setArchiveTarget(null); }}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
       {historyAccount && (
