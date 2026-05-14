@@ -12,7 +12,7 @@ const ICON_MAP = {
 };
 import Papa from 'papaparse';
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring } from '../hooks/useExpenses';
-import { useCategories, useAllSubtypes } from '../hooks/useCategories';
+import { useCategories, useAllSubtypes, useCreateCategory, useCreateSubtype } from '../hooks/useCategories';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -70,17 +70,64 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
   const { toast } = useToast();
   const create = useCreateExpense();
   const update = useUpdateExpense();
+  const createCat = useCreateCategory();
+  const createSubtype = useCreateSubtype();
   const isEdit = !!expense?.id;
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: expense
       ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', subtype: expense.subtype ?? '', notes: expense.notes ?? '', is_recurring: !!expense.is_recurring }
       : { date: new Date().toLocaleDateString('en-CA'), is_recurring: false, subtype: '' },
   });
 
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [extraCats, setExtraCats] = useState([]);
+
+  const [showAddSubtype, setShowAddSubtype] = useState(false);
+  const [newSubtypeName, setNewSubtypeName] = useState('');
+  const [extraSubtypes, setExtraSubtypes] = useState([]);
+
+  const allCategories = useMemo(() => {
+    const ids = new Set(categories.map((c) => c.id));
+    return [...categories, ...extraCats.filter((c) => !ids.has(c.id))];
+  }, [categories, extraCats]);
+
   const selectedCategoryId = watch('category_id');
-  const subtypes = selectedCategoryId ? (subtypesByCategory[String(selectedCategoryId)] ?? []) : [];
+  const baseSubtypes = selectedCategoryId ? (subtypesByCategory[String(selectedCategoryId)] ?? []) : [];
+  const subtypeIds = new Set(baseSubtypes.map((s) => s.id));
+  const subtypes = [...baseSubtypes, ...extraSubtypes.filter((s) => !subtypeIds.has(s.id))];
   const datalistId = `subtypes-${selectedCategoryId}`;
+
+  async function handleAddCategory() {
+    if (!newCatName.trim()) return;
+    try {
+      const res = await createCat.mutateAsync({ name: newCatName.trim() });
+      const newCat = res.data;
+      setExtraCats((prev) => [...prev, newCat]);
+      setValue('category_id', String(newCat.id));
+      setNewCatName('');
+      setShowAddCat(false);
+      toast(`Category "${newCat.name}" added`);
+    } catch (err) {
+      toast(err?.error ?? 'Failed to add category', 'error');
+    }
+  }
+
+  async function handleAddSubtype() {
+    if (!newSubtypeName.trim() || !selectedCategoryId) return;
+    try {
+      const res = await createSubtype.mutateAsync({ categoryId: selectedCategoryId, name: newSubtypeName.trim() });
+      const newSub = res.data;
+      setExtraSubtypes((prev) => [...prev, newSub]);
+      setValue('subtype', newSub.name);
+      setNewSubtypeName('');
+      setShowAddSubtype(false);
+      toast(`Type "${newSub.name}" added`);
+    } catch (err) {
+      toast(err?.error ?? 'Failed to add type', 'error');
+    }
+  }
 
   async function onSubmit(data) {
     try {
@@ -101,18 +148,66 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
         <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category *</label>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddCat((v) => !v); setNewCatName(''); }}
+                  className="flex items-center gap-0.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
+                >
+                  <Plus size={12} /> Add category
+                </button>
+              </div>
               <select {...register('category_id', { required: 'Category is required' })} className={selectCls}>
                 <option value="">— Select a category —</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {allCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {errors.category_id && <p className="text-xs text-red-500 mt-1">{errors.category_id.message}</p>}
+              {showAddCat && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(); } if (e.key === 'Escape') { setShowAddCat(false); setNewCatName(''); } }}
+                    placeholder="New category name"
+                    className={inputCls}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    disabled={createCat.isPending || !newCatName.trim()}
+                    className="shrink-0 bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    {createCat.isPending ? '…' : 'Add'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddCat(false); setNewCatName(''); }}
+                    className="shrink-0 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Type / Store
-                <span className="ml-1 text-xs text-gray-400 font-normal">(optional)</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Type / Store
+                  <span className="ml-1 text-xs text-gray-400 font-normal">(optional)</span>
+                </label>
+                {selectedCategoryId && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddSubtype((v) => !v); setNewSubtypeName(watch('subtype') || ''); }}
+                    className="flex items-center gap-0.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
+                  >
+                    <Plus size={12} /> Add type
+                  </button>
+                )}
+              </div>
               <input
                 {...register('subtype')}
                 list={datalistId}
@@ -124,6 +219,34 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
                 <datalist id={datalistId}>
                   {subtypes.map((s) => <option key={s.id} value={s.name} />)}
                 </datalist>
+              )}
+              {showAddSubtype && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={newSubtypeName}
+                    onChange={(e) => setNewSubtypeName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtype(); } if (e.key === 'Escape') { setShowAddSubtype(false); setNewSubtypeName(''); } }}
+                    placeholder="New type name"
+                    className={inputCls}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddSubtype}
+                    disabled={createSubtype.isPending || !newSubtypeName.trim()}
+                    className="shrink-0 bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    {createSubtype.isPending ? '…' : 'Add'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddSubtype(false); setNewSubtypeName(''); }}
+                    className="shrink-0 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               )}
             </div>
             <div>
