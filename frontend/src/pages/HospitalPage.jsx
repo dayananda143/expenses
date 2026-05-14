@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload } from 'lucide-react';
 import Papa from 'papaparse';
@@ -9,6 +9,8 @@ import {
   useCreateHospitalExpense,
   useUpdateHospitalExpense,
   useDeleteHospitalExpense,
+  useHospitalCategories,
+  useCreateHospitalCategory,
 } from '../hooks/useHospitalExpenses';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
@@ -19,6 +21,8 @@ import { useAuth } from '../contexts/AuthContext';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500';
 const selectCls = `${inputCls} appearance-none`;
+
+const PRESET_COLORS = ['#e11d48','#3b82f6','#10b981','#8b5cf6','#f97316','#14b8a6','#6b7280','#eab308'];
 
 function fmt(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n ?? 0);
@@ -65,13 +69,14 @@ function MonthYearPicker({ month, year, onChange, onClear }) {
   );
 }
 
-function HospitalModal({ expense, hospitalUsers, isAdmin, onClose }) {
+function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose }) {
   const { toast } = useToast();
   const create = useCreateHospitalExpense();
   const update = useUpdateHospitalExpense();
+  const createCat = useCreateHospitalCategory();
   const isEdit = !!expense?.id;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: expense
       ? {
           description: expense.description,
@@ -80,12 +85,35 @@ function HospitalModal({ expense, hospitalUsers, isAdmin, onClose }) {
           hospital: expense.hospital ?? '',
           notes: expense.notes ?? '',
           assigned_to: expense.user_id ?? '',
+          category_id: expense.category_id ?? '',
         }
-      : {
-          date: new Date().toLocaleDateString('en-CA'),
-          assigned_to: '',
-        },
+      : { date: new Date().toLocaleDateString('en-CA'), assigned_to: '', category_id: '' },
   });
+
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState('#e11d48');
+  const [extraCats, setExtraCats] = useState([]);
+
+  const allCategories = useMemo(() => {
+    const ids = new Set(categories.map((c) => c.id));
+    return [...categories, ...extraCats.filter((c) => !ids.has(c.id))];
+  }, [categories, extraCats]);
+
+  async function handleAddCategory() {
+    if (!newCatName.trim()) return;
+    try {
+      const res = await createCat.mutateAsync({ name: newCatName.trim(), color: newCatColor });
+      const newCat = res.data;
+      setExtraCats((prev) => [...prev, newCat]);
+      setValue('category_id', String(newCat.id));
+      setNewCatName('');
+      setShowAddCat(false);
+      toast(`Category "${newCat.name}" added`);
+    } catch (err) {
+      toast(err?.error ?? 'Failed to add category', 'error');
+    }
+  }
 
   async function onSubmit(data) {
     try {
@@ -95,6 +123,7 @@ function HospitalModal({ expense, hospitalUsers, isAdmin, onClose }) {
         hospital: data.hospital || null,
         notes: data.notes || null,
         assigned_to: data.assigned_to ? parseInt(data.assigned_to) : undefined,
+        category_id: data.category_id || null,
       };
       if (isEdit) { await update.mutateAsync({ id: expense.id, ...payload }); toast('Expense updated'); }
       else        { await create.mutateAsync(payload); toast('Expense added'); }
@@ -117,9 +146,7 @@ function HospitalModal({ expense, hospitalUsers, isAdmin, onClose }) {
         <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
           {isAdmin && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Assign to User *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assign to User *</label>
               <select {...register('assigned_to', { required: 'Required' })} className={selectCls}>
                 <option value="">— Select user —</option>
                 {(hospitalUsers ?? []).map((u) => (
@@ -129,6 +156,62 @@ function HospitalModal({ expense, hospitalUsers, isAdmin, onClose }) {
               {errors.assigned_to && <p className="text-xs text-red-500 mt-1">{errors.assigned_to.message}</p>}
             </div>
           )}
+
+          {/* Category */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
+              <button
+                type="button"
+                onClick={() => { setShowAddCat((v) => !v); setNewCatName(''); setNewCatColor('#e11d48'); }}
+                className="flex items-center gap-0.5 text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors"
+              >
+                <Plus size={12} /> Add category
+              </button>
+            </div>
+            <select {...register('category_id')} className={selectCls}>
+              <option value="">— No category —</option>
+              {allCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            {showAddCat && (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(); } if (e.key === 'Escape') { setShowAddCat(false); } }}
+                  placeholder="Category name"
+                  className={inputCls}
+                  autoFocus
+                />
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1.5 flex-wrap flex-1">
+                    {PRESET_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNewCatColor(c)}
+                        className={`w-5 h-5 rounded-full transition-transform ${newCatColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : ''}`}
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    disabled={createCat.isPending || !newCatName.trim()}
+                    className="shrink-0 bg-rose-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-rose-700 disabled:opacity-50 transition-colors"
+                  >
+                    {createCat.isPending ? '…' : 'Add'}
+                  </button>
+                  <button type="button" onClick={() => setShowAddCat(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg">
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description *</label>
             <input {...register('description', { required: 'Required' })} className={inputCls} placeholder="e.g. ER visit, Lab tests" />
@@ -172,6 +255,7 @@ function HospitalModal({ expense, hospitalUsers, isAdmin, onClose }) {
   );
 }
 
+
 export default function HospitalPage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -182,15 +266,15 @@ export default function HospitalPage() {
   const [month, setMonth]   = useState(null);
   const [year, setYear]     = useState(now.getFullYear());
   const [search, setSearch] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [page, setPage]     = useState(1);
   const [limit, setLimit]   = useState(10);
-  const [filterUser, setFilterUser] = useState('');
-  const [sort, setSort]   = useState('date');
-  const [order, setOrder] = useState('desc');
+  const [sort, setSort]     = useState('date');
+  const [order, setOrder]   = useState('desc');
   const [showModal, setShowModal]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-
   function handleSort(field) {
     if (sort === field) setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
     else { setSort(field); setOrder('asc'); }
@@ -199,6 +283,9 @@ export default function HospitalPage() {
 
   const { data: usersData } = useHospitalUsers();
   const hospitalUsers = usersData?.data ?? [];
+
+  const { data: catsData } = useHospitalCategories();
+  const categories = catsData?.data ?? [];
 
   const { data, isLoading, error } = useHospitalExpenses({
     month: month ?? undefined,
@@ -209,6 +296,7 @@ export default function HospitalPage() {
     sort,
     order,
     user_id: isAdmin && filterUser ? filterUser : undefined,
+    category_id: filterCategory || undefined,
   });
   const { data: summary } = useHospitalSummary(year, isAdmin && filterUser ? filterUser : undefined);
   const del = useDeleteHospitalExpense();
@@ -267,7 +355,7 @@ export default function HospitalPage() {
     }
   }
 
-  const colSpan = isAdmin ? 6 : 4;
+  const colSpan = isAdmin ? 7 : 5;
 
   return (
     <div className="space-y-4">
@@ -336,6 +424,16 @@ export default function HospitalPage() {
           onChange={(m, y) => { setMonth(m); setYear(y); setPage(1); }}
           onClear={() => { setMonth(null); setPage(1); }}
         />
+        {categories.length > 0 && (
+          <select
+            value={filterCategory}
+            onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
+            className="text-xs rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-rose-500"
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
         {isAdmin && (
           <div className="flex items-center gap-1.5 min-w-[140px]">
             <User size={14} className="text-gray-400 shrink-0" />
@@ -373,14 +471,15 @@ export default function HospitalPage() {
         <>
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                  {(['date', 'description'] ).map((field) => (
+                  {(['date', 'description']).map((field) => (
                     <th key={field} onClick={() => handleSort(field)} className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors">
                       <span className="inline-flex items-center gap-1 capitalize">{field} <SortIcon field={field} sort={sort} order={order} /></span>
                     </th>
                   ))}
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Category</th>
                   {isAdmin && <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">User</th>}
                   <th onClick={() => handleSort('hospital')} className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors">
                     <span className="inline-flex items-center gap-1">Hospital <SortIcon field="hospital" sort={sort} order={order} /></span>
@@ -405,6 +504,11 @@ export default function HospitalPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800 dark:text-gray-200">{row.description}</p>
                       {row.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{row.notes}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.category_name
+                        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: row.category_color + '22', color: row.category_color }}>{row.category_name}</span>
+                        : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3">
@@ -484,6 +588,7 @@ export default function HospitalPage() {
         <HospitalModal
           isAdmin={isAdmin}
           hospitalUsers={hospitalUsers}
+          categories={categories}
           onClose={() => setShowModal(false)}
         />
       )}
@@ -492,6 +597,7 @@ export default function HospitalPage() {
           expense={editTarget}
           isAdmin={isAdmin}
           hospitalUsers={hospitalUsers}
+          categories={categories}
           onClose={() => setEditTarget(null)}
         />
       )}

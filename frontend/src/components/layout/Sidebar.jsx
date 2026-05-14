@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, Egg, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, Egg, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -10,9 +10,10 @@ const allLinks = [
 ];
 
 const adminLinks = [
-  { to: '/users',      label: 'Users',      Icon: Users  },
-  { to: '/categories', label: 'Categories', Icon: Tag,    indiaHide: true },
-  { to: '/budgets',    label: 'Budgets',    Icon: Target, indiaHide: true },
+  { to: '/users',                label: 'Users',               Icon: Users  },
+  { to: '/categories',           label: 'Categories',          Icon: Tag,         indiaHide: true },
+  { to: '/hospital-categories',  label: 'Hospital Categories', Icon: Stethoscope, indiaHide: true },
+  { to: '/budgets',              label: 'Budgets',             Icon: Target,      indiaHide: true },
 ];
 
 export default function Sidebar({ onClose }) {

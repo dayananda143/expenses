@@ -23,25 +23,65 @@ router.get('/users', (req, res, next) => {
   }
 });
 
+// ── Hospital Categories ──────────────────────────────────────────────────────
+
+router.get('/categories', (req, res, next) => {
+  try {
+    res.json({ data: db.prepare('SELECT * FROM hospital_categories ORDER BY name ASC').all() });
+  } catch (err) { next(err); }
+});
+
+router.post('/categories', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { name, color, icon } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    const r = db.prepare('INSERT INTO hospital_categories (name, color, icon) VALUES (?, ?, ?)').run(name.trim(), color ?? '#e11d48', icon ?? 'circle');
+    res.status(201).json({ data: db.prepare('SELECT * FROM hospital_categories WHERE id = ?').get(r.lastInsertRowid) });
+  } catch (err) { next(err); }
+});
+
+router.put('/categories/:cid', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { name, color, icon } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    db.prepare('UPDATE hospital_categories SET name = ?, color = ?, icon = ? WHERE id = ?').run(name.trim(), color ?? '#e11d48', icon ?? 'circle', req.params.cid);
+    res.json({ data: db.prepare('SELECT * FROM hospital_categories WHERE id = ?').get(req.params.cid) });
+  } catch (err) { next(err); }
+});
+
+router.delete('/categories/:cid', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    db.prepare('DELETE FROM hospital_categories WHERE id = ?').run(req.params.cid);
+    res.status(204).send();
+  } catch (err) { next(err); }
+});
+
+// ── Hospital Expenses ────────────────────────────────────────────────────────
+
 // GET /api/hospital-expenses
 router.get('/', (req, res, next) => {
   try {
-    const { month, year, search, page = 1, limit: limitQ = 25, user_id, sort, order } = req.query;
+    const { month, year, search, page = 1, limit: limitQ = 25, user_id, category_id, sort, order } = req.query;
     const SORT_COLS = { date: 'h.date', description: 'h.description', hospital: 'h.hospital', amount: 'h.amount' };
     const sortCol   = SORT_COLS[sort] ?? 'h.date';
     const sortDir   = order === 'asc' ? 'ASC' : 'DESC';
     const limit = Math.min(Math.max(parseInt(limitQ) || 25, 1), 100);
     const offset = (parseInt(page) - 1) * limit;
 
-    // Everyone with hospital_access sees all records; admin can filter by user_id
     let where = '1=1';
     const params = [];
 
     if (req.user.is_admin && user_id) {
-      where = 'h.user_id = ?';
+      where += ' AND h.user_id = ?';
       params.push(user_id);
     }
-
+    if (category_id) {
+      where += ' AND h.category_id = ?';
+      params.push(category_id);
+    }
     if (month && year) {
       where += ' AND strftime(\'%m\', h.date) = ? AND strftime(\'%Y\', h.date) = ?';
       params.push(String(month).padStart(2, '0'), String(year));
@@ -49,20 +89,19 @@ router.get('/', (req, res, next) => {
       where += ' AND strftime(\'%Y\', h.date) = ?';
       params.push(String(year));
     }
-
     if (search) {
       where += ' AND (h.description LIKE ? OR h.hospital LIKE ? OR h.notes LIKE ?)';
       const s = `%${search}%`;
       params.push(s, s, s);
     }
 
-    const total = db.prepare(
-      `SELECT COUNT(*) AS n FROM hospital_expenses h WHERE ${where}`
-    ).get(...params).n;
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM hospital_expenses h WHERE ${where}`).get(...params).n;
 
     const rows = db.prepare(
-      `SELECT h.*, u.username FROM hospital_expenses h
+      `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color
+       FROM hospital_expenses h
        LEFT JOIN users u ON u.id = h.user_id
+       LEFT JOIN hospital_categories hc ON hc.id = h.category_id
        WHERE ${where}
        ORDER BY ${sortCol} ${sortDir}, h.created_at DESC LIMIT ? OFFSET ?`
     ).all(...params, limit, offset);
@@ -77,26 +116,28 @@ router.get('/', (req, res, next) => {
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { description, amount, date, hospital, notes, assigned_to } = req.body;
+    const { description, amount, date, hospital, notes, assigned_to, category_id } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
     if (parsedAmount !== null && parsedAmount < 0) return res.status(400).json({ error: 'amount cannot be negative' });
 
-    // Admins can assign to another user; others always own themselves
     let targetUserId = req.user.id;
     if (req.user.is_admin && assigned_to) {
       const target = db.prepare('SELECT id FROM users WHERE id = ?').get(assigned_to);
       if (!target) return res.status(400).json({ error: 'Assigned user not found' });
       targetUserId = target.id;
     }
+    const catId = category_id ? parseInt(category_id) : null;
 
     const result = db.prepare(
-      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null);
+      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId);
 
     const row = db.prepare(
-      'SELECT h.*, u.username FROM hospital_expenses h LEFT JOIN users u ON u.id = h.user_id WHERE h.id = ?'
+      `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color
+       FROM hospital_expenses h LEFT JOIN users u ON u.id = h.user_id
+       LEFT JOIN hospital_categories hc ON hc.id = h.category_id WHERE h.id = ?`
     ).get(result.lastInsertRowid);
     res.status(201).json({ data: row });
   } catch (err) {
@@ -111,7 +152,7 @@ router.put('/:id', (req, res, next) => {
     const row = db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    const { description, amount, date, hospital, notes, assigned_to } = req.body;
+    const { description, amount, date, hospital, notes, assigned_to, category_id } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
@@ -123,13 +164,16 @@ router.put('/:id', (req, res, next) => {
       if (!target) return res.status(400).json({ error: 'Assigned user not found' });
       targetUserId = target.id;
     }
+    const catId = category_id ? parseInt(category_id) : null;
 
     db.prepare(
-      'UPDATE hospital_expenses SET user_id = ?, description = ?, amount = ?, date = ?, hospital = ?, notes = ? WHERE id = ?'
-    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, row.id);
+      'UPDATE hospital_expenses SET user_id = ?, description = ?, amount = ?, date = ?, hospital = ?, notes = ?, category_id = ? WHERE id = ?'
+    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, row.id);
 
     const updated = db.prepare(
-      'SELECT h.*, u.username FROM hospital_expenses h LEFT JOIN users u ON u.id = h.user_id WHERE h.id = ?'
+      `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color
+       FROM hospital_expenses h LEFT JOIN users u ON u.id = h.user_id
+       LEFT JOIN hospital_categories hc ON hc.id = h.category_id WHERE h.id = ?`
     ).get(row.id);
     res.json({ data: updated });
   } catch (err) {

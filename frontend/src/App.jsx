@@ -20,6 +20,7 @@ import CategoriesPage from './pages/CategoriesPage';
 import BudgetsPage from './pages/BudgetsPage';
 import UsersPage from './pages/UsersPage';
 import HospitalPage from './pages/HospitalPage';
+import HospitalCategoriesPage from './pages/HospitalCategoriesPage';
 import SalaryPage from './pages/SalaryPage';
 import IndiaListPage from './pages/IndiaListPage';
 import HealthPage from './pages/HealthPage';
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="poultry/uma-sbi" element={<UmaSbiPage />} />
             <Route element={<AdminRoute />}>
               <Route path="users" element={<UsersPage />} />
+              <Route path="hospital-categories" element={<HospitalCategoriesPage />} />
             </Route>
           </Route>
         </Route>

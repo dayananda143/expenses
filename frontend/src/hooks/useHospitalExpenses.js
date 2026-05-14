@@ -3,20 +3,55 @@ import client from '../api/client';
 
 const BASE = '/hospital-expenses';
 
-export function useHospitalExpenses({ month, year, search, page, limit, user_id, sort, order } = {}) {
+export function useHospitalExpenses({ month, year, search, page, limit, user_id, category_id, sort, order } = {}) {
   return useQuery({
-    queryKey: ['hospital-expenses', { month, year, search, page, limit, user_id, sort, order }],
+    queryKey: ['hospital-expenses', { month, year, search, page, limit, user_id, category_id, sort, order }],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (month)   params.set('month', month);
-      if (year)    params.set('year', year);
-      if (search)  params.set('search', search);
-      if (page)    params.set('page', page);
-      if (limit)   params.set('limit', limit);
-      if (user_id) params.set('user_id', user_id);
-      if (sort)    params.set('sort', sort);
-      if (order)   params.set('order', order);
+      if (month)       params.set('month', month);
+      if (year)        params.set('year', year);
+      if (search)      params.set('search', search);
+      if (page)        params.set('page', page);
+      if (limit)       params.set('limit', limit);
+      if (user_id)     params.set('user_id', user_id);
+      if (category_id) params.set('category_id', category_id);
+      if (sort)        params.set('sort', sort);
+      if (order)       params.set('order', order);
       return client.get(`${BASE}?${params.toString()}`);
+    },
+  });
+}
+
+export function useHospitalCategories() {
+  return useQuery({
+    queryKey: ['hospital-categories'],
+    queryFn: () => client.get(`${BASE}/categories`),
+  });
+}
+
+export function useCreateHospitalCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => client.post(`${BASE}/categories`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['hospital-categories'] }),
+  });
+}
+
+export function useUpdateHospitalCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }) => client.put(`${BASE}/categories/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['hospital-categories'] }),
+  });
+}
+
+export function useDeleteHospitalCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => client.delete(`${BASE}/categories/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['hospital-categories'] });
+      qc.invalidateQueries({ queryKey: ['hospital-expenses'] });
     },
   });
 }

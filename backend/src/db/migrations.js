@@ -120,7 +120,7 @@ function runMigrations(db) {
     const testRow = db.prepare("INSERT INTO hospital_expenses (user_id, amount, date, description) VALUES (0, NULL, '1970-01-01', '__test__')").run();
     db.prepare('DELETE FROM hospital_expenses WHERE id = ?').run(testRow.lastInsertRowid);
   } catch {
-    db.exec(`
+    try { db.exec(`
       CREATE TABLE hospital_expenses_v2 (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -140,7 +140,7 @@ function runMigrations(db) {
         BEGIN UPDATE hospital_expenses SET updated_at = datetime('now') WHERE id = OLD.id; END;
       CREATE INDEX IF NOT EXISTS idx_hospital_expenses_user ON hospital_expenses(user_id);
       CREATE INDEX IF NOT EXISTS idx_hospital_expenses_date ON hospital_expenses(date);
-    `);
+    `); } catch {}
   }
 
   // Salary entries (per-user, always USD, no date)
@@ -650,6 +650,18 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_webauthn_user ON webauthn_credentials(user_id);
   `);
+
+  // Hospital categories
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS hospital_categories (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      color      TEXT NOT NULL DEFAULT '#e11d48',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  try { db.exec("ALTER TABLE hospital_expenses ADD COLUMN category_id INTEGER DEFAULT NULL REFERENCES hospital_categories(id) ON DELETE SET NULL"); } catch {}
+  try { db.exec("ALTER TABLE hospital_categories ADD COLUMN icon TEXT NOT NULL DEFAULT 'circle'"); } catch {}
 
   // Uma SBI ledger
   db.exec(`

@@ -181,7 +181,8 @@ export default function LoginPage() {
       const result = await login(username, password);
       // If 2FA required, login() throws — handled below
       // If no 2FA, check if we should offer Face ID enrollment
-      if (webAuthnSupported && !hasFaceId) {
+      if (webAuthnSupported && !hasFaceId &&
+          await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(() => false)) {
         const tok = localStorage.getItem('expenses_token');
         setPendingToken(tok);
         setStep('enroll');
