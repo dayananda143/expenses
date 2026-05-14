@@ -63,7 +63,7 @@ export function BankLogo({ name, sizeClass = 'w-9 h-9', fallback }) {
 
   if (!bank || failed) {
     if (fallback !== undefined) return fallback;
-    const initial = (name ?? '?')[0].toUpperCase();
+    const initial = ((name || '?')[0] ?? '?').toUpperCase();
     return (
       <div className={`${sizeClass} rounded-xl flex items-center justify-center shrink-0 ${nameToColor(name)}`}>
         <span className="text-white font-bold leading-none" style={{ fontSize: 'clamp(10px, 40%, 16px)' }}>{initial}</span>
@@ -523,8 +523,8 @@ export function PaymentHistoryModal({ account, onClose }) {
   const total = payments.reduce((s, p) => s + p.amount, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm shadow-xl flex flex-col max-h-[80vh]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm shadow-xl flex flex-col max-h-[85vh] sm:max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -572,6 +572,8 @@ export function PaymentHistoryModal({ account, onClose }) {
 
 // ─── Account Card ─────────────────────────────────────────────────────────────
 
+const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
 export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDragOver, onDrop, onPayment, onView, onHistory }) {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
@@ -580,17 +582,17 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
   if (isSavings) {
     return (
       <div
-        draggable
-        onDragStart={() => onDragStart(a.id)}
-        onDragOver={(e) => onDragOver(e, a.id)}
-        onDrop={onDrop}
+        draggable={!isTouch}
+        onDragStart={!isTouch ? () => onDragStart(a.id) : undefined}
+        onDragOver={!isTouch ? (e) => onDragOver(e, a.id) : undefined}
+        onDrop={!isTouch ? onDrop : undefined}
         className={`group relative rounded-2xl border transition-all hover:shadow-md border-emerald-100 dark:border-emerald-900/40 bg-white dark:bg-gray-900 hover:border-emerald-300 dark:hover:border-emerald-700 ${!a.is_active ? 'opacity-60' : ''}`}
       >
         <div className="absolute left-0 top-4 bottom-4 w-1 rounded-full bg-emerald-400" />
         <div className="px-5 py-4 pl-6">
           <div className="flex items-start justify-between gap-3">
             <button onClick={() => onView?.(a)} className="flex items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity">
-              <GripVertical size={15} className="text-gray-300 dark:text-gray-700 cursor-grab shrink-0" />
+              <GripVertical size={15} className="hidden sm:block text-gray-300 dark:text-gray-700 cursor-grab shrink-0" />
               <BankLogo name={a.name} sizeClass="w-9 h-9" fallback={
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
                   <PiggyBank size={16} className="text-emerald-600 dark:text-emerald-400" />
@@ -615,7 +617,7 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
                 <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">{fmtUSD(a.balance)}</p>
                 <p className="text-[11px] text-gray-400">balance</p>
               </div>
-              <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex flex-col gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 {onArchive && (
                   <button onClick={() => onArchive(a)} title={a.archived ? 'Unarchive' : 'Archive'} className="p-1.5 text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors">
                     {a.archived ? <ArchiveX size={12} /> : <Archive size={12} />}
@@ -646,17 +648,19 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
 
   return (
     <div
-      draggable
-      onDragStart={() => onDragStart(a.id)}
-      onDragOver={(e) => onDragOver(e, a.id)}
-      onDrop={onDrop}
-      className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all hover:shadow-md ${!a.is_active ? 'opacity-60' : ''}`}
+      draggable={!isTouch}
+      onDragStart={!isTouch ? () => onDragStart(a.id) : undefined}
+      onDragOver={!isTouch ? (e) => onDragOver(e, a.id) : undefined}
+      onDrop={!isTouch ? onDrop : undefined}
+      className={`group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all hover:shadow-md ${!a.is_active ? 'opacity-60' : ''}`}
     >
       <div className="p-4 flex gap-3 items-start">
-        {/* Drag handle */}
-        <div className="mt-1 cursor-grab text-gray-200 dark:text-gray-700 hover:text-gray-400 shrink-0">
-          <GripVertical size={15} />
-        </div>
+        {/* Drag handle — desktop only */}
+        {!isTouch && (
+          <div className="mt-1 cursor-grab text-gray-200 dark:text-gray-700 hover:text-gray-400 shrink-0">
+            <GripVertical size={15} />
+          </div>
+        )}
 
         {/* Bank logo */}
         <BankLogo name={a.name} sizeClass="w-10 h-10" />
@@ -678,18 +682,18 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
               {!a.is_active && (
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Inactive</span>
               )}
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 {onArchive && (
-                  <button onClick={() => onArchive(a)} title={a.archived ? 'Unarchive' : 'Archive'} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                  <button onClick={() => onArchive(a)} title={a.archived ? 'Unarchive' : 'Archive'} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                     {a.archived ? <ArchiveX size={13} /> : <Archive size={13} />}
                   </button>
                 )}
                 {!a.archived && (
-                  <button onClick={() => onEdit(a)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                  <button onClick={() => onEdit(a)} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                     <Pencil size={13} />
                   </button>
                 )}
-                <button onClick={() => onDelete(a)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                <button onClick={() => onDelete(a)} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                   <Trash2 size={13} />
                 </button>
               </div>

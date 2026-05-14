@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, KeyRound, ChevronDown, Receipt, Sun, Moon, ArrowLeftRight, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Menu, LogOut, KeyRound, ChevronDown, Receipt, Sun, Moon, ArrowLeftRight, ShieldCheck, ShieldOff, ScanFace } from 'lucide-react';
 import { US, IN } from 'country-flag-icons/react/3x2';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -9,6 +9,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 const FLAG_COMPONENTS = { us: US, india: IN };
 import ChangePasswordModal from '../auth/ChangePasswordModal';
 import TwoFactorModal from '../auth/TwoFactorModal';
+import FaceIDModal from '../auth/FaceIDModal';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
@@ -17,6 +18,7 @@ export default function Header({ onMenuClick }) {
   const navigate = useNavigate();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
+  const [showFaceID, setShowFaceID] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   const initial = user?.username?.[0]?.toUpperCase() ?? '?';
@@ -109,6 +111,15 @@ export default function Header({ onMenuClick }) {
                         : <ShieldCheck size={15} className="text-emerald-500 shrink-0" />}
                       {user?.totp_enabled ? 'Disable 2FA' : 'Enable 2FA'}
                     </button>
+                    {typeof window !== 'undefined' && !!window.PublicKeyCredential && (
+                      <button
+                        onClick={() => { setShowFaceID(true); setShowMenu(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                      >
+                        <ScanFace size={15} className="text-emerald-500 shrink-0" />
+                        Face ID
+                      </button>
+                    )}
                     <div className="mx-3 border-t border-gray-100 dark:border-gray-700 my-1" />
                     <button
                       onClick={() => { setShowMenu(false); logout(); }}
@@ -127,6 +138,7 @@ export default function Header({ onMenuClick }) {
 
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
       {show2FA && <TwoFactorModal onClose={() => setShow2FA(false)} />}
+      {showFaceID && <FaceIDModal onClose={() => setShowFaceID(false)} />}
     </>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import BottomNav from './BottomNav';
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -23,10 +24,11 @@ export default function AppShell() {
         `}>
           <Sidebar onClose={() => setSidebarOpen(false)} />
         </div>
-        <main className="flex-1 overflow-auto p-3 sm:p-6">
+        <main className="flex-1 overflow-auto p-3 sm:p-6 pb-20 lg:pb-6">
           <Outlet />
         </main>
       </div>
+      <BottomNav onMenuClick={() => setSidebarOpen(true)} />
     </div>
   );
 }

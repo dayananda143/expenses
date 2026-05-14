@@ -92,12 +92,14 @@ function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }
       </div>
       <div className="min-w-0">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{value}</p>
+        <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{value}</p>
         {sub && <p className={`text-xs mt-0.5 ${subColor ?? 'text-gray-400'}`}>{sub}</p>}
       </div>
     </div>
   );
 }
+
+const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 function AccountsBreakdown({ savings, credits }) {
   const [tab, setTab] = useState('credit');
@@ -141,9 +143,9 @@ function AccountsBreakdown({ savings, credits }) {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
-      <div className="flex items-center justify-between mb-4 gap-3">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <h2 className="text-sm font-bold text-gray-900 dark:text-white">All Active Accounts</h2>
-        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-semibold">
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-semibold shrink-0 ml-auto">
           <button
             onClick={() => { setTab('credit'); setLocalOrder(null); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${tab === 'credit' ? 'bg-rose-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
@@ -170,15 +172,17 @@ function AccountsBreakdown({ savings, credits }) {
               return (
                 <div
                   key={a.id}
-                  draggable
-                  onDragStart={() => handleDragStart(a.id)}
-                  onDragOver={(e) => handleDragOver(e, a.id)}
-                  onDrop={handleDrop}
+                  draggable={!isTouch}
+                  onDragStart={!isTouch ? () => handleDragStart(a.id) : undefined}
+                  onDragOver={!isTouch ? (e) => handleDragOver(e, a.id) : undefined}
+                  onDrop={!isTouch ? handleDrop : undefined}
                   className="flex items-center gap-2 py-2 border-b border-gray-50 dark:border-gray-800 last:border-0 group"
                 >
-                  <div className="p-1 text-gray-300 dark:text-gray-700 cursor-grab active:cursor-grabbing shrink-0">
-                    <GripVertical size={13} />
-                  </div>
+                  {!isTouch && (
+                    <div className="p-1 text-gray-300 dark:text-gray-700 cursor-grab active:cursor-grabbing shrink-0">
+                      <GripVertical size={13} />
+                    </div>
+                  )}
                   <button
                     onClick={() => setViewAccount(a)}
                     className="flex-1 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl px-2 py-0.5 -mx-2 transition-colors text-left min-w-0"

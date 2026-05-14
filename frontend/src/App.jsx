@@ -22,6 +22,19 @@ import UsersPage from './pages/UsersPage';
 import HospitalPage from './pages/HospitalPage';
 import SalaryPage from './pages/SalaryPage';
 import IndiaListPage from './pages/IndiaListPage';
+import HealthPage from './pages/HealthPage';
+import HealthMealsPage from './pages/HealthMealsPage';
+import HealthWaterPage from './pages/HealthWaterPage';
+import HealthWeightPage from './pages/HealthWeightPage';
+import PoultryPage from './pages/PoultryPage';
+import PoultryFlockPage from './pages/PoultryFlockPage';
+import PoultryMortalityPage from './pages/PoultryMortalityPage';
+import PoultryExpensesPage from './pages/PoultryExpensesPage';
+import PoultrySalesPage from './pages/PoultrySalesPage';
+import PoultryInsightsPage from './pages/PoultryInsightsPage';
+import PoultryStakePage from './pages/PoultryStakePage';
+import LoanPage from './pages/LoanPage';
+import UmaSbiPage from './pages/UmaSbiPage';
 import { useWorkspace } from './contexts/WorkspaceContext';
 import { useAuth } from './contexts/AuthContext';
 
@@ -34,6 +47,13 @@ function WorkspaceRoute() {
 function ExpensesRoute() {
   const { workspace } = useWorkspace();
   return workspace === 'india' ? <IndiaLedgerPage /> : <ExpensesPage />;
+}
+
+function DashboardRoute() {
+  const { workspace } = useWorkspace();
+  if (workspace === 'health') return <Navigate to="/health" replace />;
+  if (workspace === 'poultry') return <Navigate to="/poultry" replace />;
+  return <DashboardPage />;
 }
 
 function HospitalRoute() {
@@ -59,17 +79,30 @@ export default function App() {
         <Route element={<WorkspaceRoute />}>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard"  element={<DashboardPage />} />
+            <Route path="dashboard"  element={<DashboardRoute />} />
             <Route path="insights"   element={<InsightsPage />} />
             <Route path="priority"   element={<PriorityPage />} />
             <Route path="expenses"   element={<ExpensesRoute />} />
             <Route path="savings"    element={<IndiaSavingsPage />} />
             <Route path="lic"        element={<LICPage />} />
+            <Route path="loans"      element={<LoanPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="budgets"    element={<BudgetsPage />} />
             <Route path="hospital"   element={<HospitalRoute />} />
             <Route path="salary"     element={<SalaryPage />} />
             <Route path="india-list" element={<IndiaListPage />} />
+            <Route path="health" element={<HealthPage />} />
+            <Route path="health/meals" element={<HealthMealsPage />} />
+            <Route path="health/water" element={<HealthWaterPage />} />
+            <Route path="health/weight" element={<HealthWeightPage />} />
+            <Route path="poultry" element={<PoultryPage />} />
+            <Route path="poultry/flock" element={<PoultryFlockPage />} />
+            <Route path="poultry/mortality" element={<PoultryMortalityPage />} />
+            <Route path="poultry/expenses" element={<PoultryExpensesPage />} />
+            <Route path="poultry/sales" element={<PoultrySalesPage />} />
+            <Route path="poultry/insights" element={<PoultryInsightsPage />} />
+            <Route path="poultry/stake" element={<PoultryStakePage />} />
+            <Route path="poultry/uma-sbi" element={<UmaSbiPage />} />
             <Route element={<AdminRoute />}>
               <Route path="users" element={<UsersPage />} />
             </Route>

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark, ScanFace } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ChangePasswordModal from '../../components/auth/ChangePasswordModal';
 import TwoFactorModal from '../../components/auth/TwoFactorModal';
+import FaceIDModal from '../../components/auth/FaceIDModal';
 
 const NAV = [
   { to: '/accounts/dashboard',     label: 'Dashboard',     Icon: LayoutDashboard },
@@ -40,6 +41,7 @@ export default function AccountsShell() {
   const [showMenu, setShowMenu] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [show2FA, setShow2FA] = useState(false);
+  const [showFaceID, setShowFaceID] = useState(false);
 
   const initial = user?.username?.[0]?.toUpperCase() ?? '?';
 
@@ -88,7 +90,7 @@ export default function AccountsShell() {
         </aside>
 
         {/* Main */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
           {/* Top header — matches main Header style */}
           <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center px-3 sm:px-6 gap-2 sm:gap-4 shrink-0 z-10">
             <button
@@ -173,6 +175,15 @@ export default function AccountsShell() {
                             : <ShieldCheck size={15} className="text-violet-500 shrink-0" />}
                           {user?.totp_enabled ? 'Disable 2FA' : 'Enable 2FA'}
                         </button>
+                        {typeof window !== 'undefined' && !!window.PublicKeyCredential && (
+                          <button
+                            onClick={() => { setShowFaceID(true); setShowMenu(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                          >
+                            <ScanFace size={15} className="text-violet-500 shrink-0" />
+                            Face ID
+                          </button>
+                        )}
                         <div className="mx-3 border-t border-gray-100 dark:border-gray-700 my-1" />
                         <button
                           onClick={() => { setShowMenu(false); logout(); }}
@@ -189,14 +200,42 @@ export default function AccountsShell() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-7">
+          <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-7 pb-24 lg:pb-7">
             <Outlet />
           </main>
         </div>
       </div>
 
+      {/* Mobile bottom nav */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-stretch justify-around"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        {NAV.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-[10px] font-medium transition-colors ${
+                isActive
+                  ? 'text-violet-600 dark:text-violet-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <Icon size={20} className={isActive ? 'text-violet-600 dark:text-violet-400' : 'text-gray-400 dark:text-gray-500'} />
+                <span>{label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
       {show2FA && <TwoFactorModal onClose={() => setShow2FA(false)} />}
+      {showFaceID && <FaceIDModal onClose={() => setShowFaceID(false)} />}
     </>
   );
 }

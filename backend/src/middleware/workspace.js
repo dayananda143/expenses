@@ -1,6 +1,6 @@
 const db = require('../db/database');
 
-const VALID = ['india', 'us'];
+const VALID = ['india', 'us', 'health'];
 
 module.exports = function requireWorkspace(req, res, next) {
   const workspace = req.query.workspace || req.body?.workspace;

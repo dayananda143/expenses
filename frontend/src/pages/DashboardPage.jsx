@@ -112,6 +112,8 @@ export default function DashboardPage() {
   const tooltipStyle = dark
     ? { backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f9fafb' }
     : { backgroundColor: '#fff', border: '1px solid #e5e7eb', color: '#111827' };
+  const tooltipLabelStyle = dark ? { color: '#f9fafb' } : { color: '#111827' };
+  const tooltipItemStyle  = dark ? { color: '#d1fae5' } : { color: '#111827' };
 
   const selectedMonthKey = `${year}-${String(month).padStart(2, '0')}`;
 
@@ -302,6 +304,8 @@ export default function DashboardPage() {
                       <Tooltip
                         formatter={(v) => [fmtRound(v), 'Spent']}
                         contentStyle={tooltipStyle}
+                        labelStyle={tooltipLabelStyle}
+                        itemStyle={tooltipItemStyle}
                         cursor={{ fill: dark ? '#374151' : '#f3f4f6' }}
                       />
                       <Bar

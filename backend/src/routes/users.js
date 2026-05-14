@@ -39,7 +39,7 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username.toLowerCase().trim());
     if (existing) return res.status(409).json({ error: 'Username already exists' });
 
-    const wsArray = Array.isArray(workspaces) ? workspaces.filter((w) => ['india', 'us'].includes(w)) : ['india', 'us'];
+    const wsArray = Array.isArray(workspaces) ? workspaces.filter((w) => ['india', 'us', 'health'].includes(w)) : ['india', 'us'];
 
     const hash = await bcrypt.hash(password, 12);
     const result = db.prepare(

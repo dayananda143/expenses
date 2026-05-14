@@ -6,6 +6,13 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: #f9fafb;
+}
+html.dark {
+  background-color: #030712;
+}
+
 /* ---- Scrollbar (webkit) ---- */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; border-radius: 999px; }

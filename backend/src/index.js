@@ -19,8 +19,14 @@ const licRouter             = require('./routes/lic');
 const priorityRouter        = require('./routes/priority');
 const indiaListRouter       = require('./routes/indiaList');
 const lentRouter            = require('./routes/lent');
+const healthRouter          = require('./routes/health');
+const poultryRouter         = require('./routes/poultry');
+const loansRouter           = require('./routes/loans');
+const umaSbiRouter          = require('./routes/umaSbi');
 const errorHandler     = require('./middleware/errorHandler');
 const requireAuth      = require('./middleware/auth');
+
+const path = require('path');
 
 const app  = express();
 const PORT = process.env.PORT || 3002;
@@ -33,6 +39,7 @@ app.use(cors({
   ]
 }));
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Public routes
 app.use('/api/auth', authRouter);
@@ -53,6 +60,10 @@ app.use('/api/lic',              licRouter);
 app.use('/api/priority',         priorityRouter);
 app.use('/api/india-list',       indiaListRouter);
 app.use('/api/lent',             lentRouter);
+app.use('/api/health',           healthRouter);
+app.use('/api/poultry',          poultryRouter);
+app.use('/api/loans',            loansRouter);
+app.use('/api/uma-sbi',          umaSbiRouter);
 app.use(errorHandler);
 
 db.ready.then(() => {

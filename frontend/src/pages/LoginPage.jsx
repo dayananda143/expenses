@@ -1,20 +1,33 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { useAuth } from '../contexts/AuthContext';
 
 const inputCls = 'w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-colors';
 
+function FaceIdIcon({ className = 'w-6 h-6' }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 4H8a4 4 0 00-4 4v6" />
+      <path d="M34 4h6a4 4 0 014 4v6" />
+      <path d="M14 44H8a4 4 0 01-4-4v-6" />
+      <path d="M34 44h6a4 4 0 004-4v-6" />
+      <circle cx="17" cy="21" r="2" fill="currentColor" stroke="none" />
+      <circle cx="31" cy="21" r="2" fill="currentColor" stroke="none" />
+      <path d="M24 22v5" />
+      <path d="M17 33c1.8 2.5 5.2 4 7 4s5.2-1.5 7-4" />
+    </svg>
+  );
+}
+
 function IllustrationPanel() {
   return (
     <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-10 relative overflow-hidden">
-      {/* Background blobs */}
       <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3" />
       <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-1/3 -translate-x-1/3" />
       <div className="absolute top-1/2 left-1/2 w-40 h-40 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
-
-      {/* Logo */}
       <div className="relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -27,71 +40,42 @@ function IllustrationPanel() {
           <span className="text-white font-bold text-xl tracking-tight">Expenses</span>
         </div>
       </div>
-
-      {/* Main illustration */}
       <div className="relative z-10 flex-1 flex items-center justify-center py-10">
         <svg viewBox="0 0 320 280" fill="none" className="w-full max-w-xs drop-shadow-2xl">
-          {/* Main card */}
           <rect x="20" y="30" width="280" height="170" rx="16" fill="white" fillOpacity="0.12" />
           <rect x="20" y="30" width="280" height="170" rx="16" stroke="white" strokeOpacity="0.2" strokeWidth="1" />
-
-          {/* Card header */}
           <rect x="20" y="30" width="280" height="52" rx="16" fill="white" fillOpacity="0.08" />
           <rect x="20" y="66" width="280" height="16" fill="white" fillOpacity="0.08" />
-
-          {/* Header text */}
           <rect x="40" y="46" width="80" height="8" rx="4" fill="white" fillOpacity="0.5" />
           <rect x="220" y="44" width="60" height="12" rx="4" fill="white" fillOpacity="0.3" />
-
-          {/* Chart bars */}
           <rect x="50" y="110" width="28" height="60" rx="6" fill="white" fillOpacity="0.15" />
           <rect x="50" y="128" width="28" height="42" rx="6" fill="#34d399" fillOpacity="0.8" />
-
           <rect x="94" y="100" width="28" height="70" rx="6" fill="white" fillOpacity="0.15" />
           <rect x="94" y="110" width="28" height="60" rx="6" fill="#34d399" fillOpacity="0.6" />
-
           <rect x="138" y="120" width="28" height="50" rx="6" fill="white" fillOpacity="0.15" />
           <rect x="138" y="138" width="28" height="32" rx="6" fill="#34d399" fillOpacity="0.9" />
-
           <rect x="182" y="105" width="28" height="65" rx="6" fill="white" fillOpacity="0.15" />
           <rect x="182" y="113" width="28" height="57" rx="6" fill="#34d399" />
-
           <rect x="226" y="115" width="28" height="55" rx="6" fill="white" fillOpacity="0.15" />
           <rect x="226" y="125" width="28" height="45" rx="6" fill="#34d399" fillOpacity="0.7" />
-
-          {/* Bottom line */}
           <line x1="40" y1="173" x2="280" y2="173" stroke="white" strokeOpacity="0.15" strokeWidth="1" />
-
-          {/* Stat cards row */}
           <rect x="20" y="216" width="84" height="48" rx="12" fill="white" fillOpacity="0.12" stroke="white" strokeOpacity="0.15" strokeWidth="1" />
           <rect x="118" y="216" width="84" height="48" rx="12" fill="white" fillOpacity="0.12" stroke="white" strokeOpacity="0.15" strokeWidth="1" />
           <rect x="216" y="216" width="84" height="48" rx="12" fill="white" fillOpacity="0.12" stroke="white" strokeOpacity="0.15" strokeWidth="1" />
-
-          {/* Stat labels */}
           <rect x="32" y="226" width="40" height="6" rx="3" fill="white" fillOpacity="0.35" />
           <rect x="32" y="240" width="56" height="10" rx="4" fill="white" fillOpacity="0.7" />
-
           <rect x="130" y="226" width="40" height="6" rx="3" fill="white" fillOpacity="0.35" />
           <rect x="130" y="240" width="48" height="10" rx="4" fill="#34d399" fillOpacity="0.9" />
-
           <rect x="228" y="226" width="40" height="6" rx="3" fill="white" fillOpacity="0.35" />
           <rect x="228" y="240" width="52" height="10" rx="4" fill="white" fillOpacity="0.7" />
         </svg>
       </div>
-
-      {/* Tagline */}
       <div className="relative z-10 space-y-3">
-        <h2 className="text-white text-2xl font-bold leading-tight">
-          Track every rupee,<br />every dollar.
-        </h2>
-        <p className="text-emerald-100/70 text-sm leading-relaxed">
-          Manage your expenses, budgets, and accounts in one place. Simple, fast, and private.
-        </p>
+        <h2 className="text-white text-2xl font-bold leading-tight">Track every rupee,<br />every dollar.</h2>
+        <p className="text-emerald-100/70 text-sm leading-relaxed">Manage your expenses, budgets, and accounts in one place. Simple, fast, and private.</p>
         <div className="flex items-center gap-3 pt-2">
           {['Expenses', 'Budgets', 'Accounts'].map((f) => (
-            <span key={f} className="text-xs bg-white/15 text-white px-3 py-1 rounded-full font-medium backdrop-blur-sm">
-              {f}
-            </span>
+            <span key={f} className="text-xs bg-white/15 text-white px-3 py-1 rounded-full font-medium backdrop-blur-sm">{f}</span>
           ))}
         </div>
       </div>
@@ -99,24 +83,111 @@ function IllustrationPanel() {
   );
 }
 
+// ─── Face ID Enroll prompt (shown after first password login) ─────────────────
+function EnrollFaceId({ pendingToken, onDone }) {
+  const [enrolling, setEnrolling] = useState(false);
+  const [error, setError] = useState('');
+
+  async function enroll() {
+    setError('');
+    setEnrolling(true);
+    try {
+      const optRes = await fetch('/api/auth/webauthn/register/options', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${pendingToken}` },
+      });
+      if (!optRes.ok) throw new Error('Could not start Face ID setup');
+      const options = await optRes.json();
+      const regResp = await startRegistration(options);
+      const verRes = await fetch('/api/auth/webauthn/register/verify', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${pendingToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(regResp),
+      });
+      const data = await verRes.json();
+      if (!verRes.ok) throw new Error(data.error || 'Setup failed');
+      onDone();
+    } catch (err) {
+      if (err.name === 'NotAllowedError') setError('Face ID was cancelled');
+      else setError(err.message || 'Setup failed');
+      setEnrolling(false);
+    }
+  }
+
+  return (
+    <div className="text-center space-y-6">
+      <div className="w-20 h-20 mx-auto rounded-3xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+        <FaceIdIcon className="w-11 h-11 text-emerald-600 dark:text-emerald-400" />
+      </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Enable Face ID</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">Sign in instantly next time using Face ID instead of your password.</p>
+      </div>
+      {error && (
+        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-left">{error}</div>
+      )}
+      <div className="space-y-3">
+        <button
+          onClick={enroll}
+          disabled={enrolling}
+          className="w-full bg-emerald-600 text-white rounded-xl px-4 py-3 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+        >
+          <FaceIdIcon className="w-5 h-5" />
+          {enrolling ? 'Setting up…' : 'Enable Face ID'}
+        </button>
+        <button onClick={onDone} className="w-full text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 py-2 transition-colors">
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const { login, loginWith2fa } = useAuth();
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [showPwd, setShowPwd] = useState(false);
-  const [step, setStep] = useState('credentials'); // 'credentials' | '2fa'
+  const [step, setStep] = useState('credentials'); // 'credentials' | '2fa' | 'enroll'
   const [tempToken, setTempToken] = useState(null);
+  const [pendingToken, setPendingToken] = useState(null);
   const [tfaCode, setTfaCode] = useState('');
   const [tfaLoading, setTfaLoading] = useState(false);
+  const [faceLoading, setFaceLoading] = useState(false);
+  const [usernameValue, setUsernameValue] = useState('');
+  const [hasFaceId, setHasFaceId] = useState(false);
   const codeRef = useRef(null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
+  const webAuthnSupported = typeof window !== 'undefined' && !!window.PublicKeyCredential;
+
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm();
+
+  // Check if the typed username has a Face ID credential
+  const watchedUsername = watch('username', '');
+  useEffect(() => {
+    if (!webAuthnSupported || !watchedUsername?.trim()) { setHasFaceId(false); return; }
+    const timer = setTimeout(() => {
+      fetch(`/api/auth/webauthn/registered?username=${encodeURIComponent(watchedUsername.trim())}`)
+        .then(r => r.json())
+        .then(d => setHasFaceId(d.registered))
+        .catch(() => setHasFaceId(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [watchedUsername, webAuthnSupported]);
 
   async function onSubmit({ username, password }) {
     try {
       setError(null);
-      await login(username, password);
-      navigate('/dashboard', { replace: true });
+      const result = await login(username, password);
+      // If 2FA required, login() throws — handled below
+      // If no 2FA, check if we should offer Face ID enrollment
+      if (webAuthnSupported && !hasFaceId) {
+        const tok = localStorage.getItem('expenses_token');
+        setPendingToken(tok);
+        setStep('enroll');
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     } catch (err) {
       if (err?.require_2fa) {
         setTempToken(err.temp_token);
@@ -144,6 +215,40 @@ export default function LoginPage() {
     }
   }
 
+  async function loginWithFaceId() {
+    const username = watchedUsername?.trim();
+    if (!username) { setError('Enter your username first'); return; }
+    setError('');
+    setFaceLoading(true);
+    try {
+      const optRes = await fetch('/api/auth/webauthn/auth/options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+      if (!optRes.ok) { setError('No Face ID credential found for this user'); return; }
+      const options = await optRes.json();
+
+      const authResp = await startAuthentication(options);
+
+      const verRes = await fetch('/api/auth/webauthn/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...authResp, username }),
+      });
+      const data = await verRes.json();
+      if (!verRes.ok) throw new Error(data.error || 'Face ID failed');
+
+      localStorage.setItem('expenses_token', data.token);
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      if (err.name === 'NotAllowedError') setError('Face ID was cancelled');
+      else setError(err.message || 'Face ID failed');
+    } finally {
+      setFaceLoading(false);
+    }
+  }
+
   const errorBanner = error && (
     <div className="flex items-start gap-2.5 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
       <svg className="w-4 h-4 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -157,8 +262,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 lg:grid lg:grid-cols-2">
       <IllustrationPanel />
 
-      {/* Right: login form */}
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center p-8 pt-[calc(env(safe-area-inset-top)+2rem)]">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
@@ -172,12 +276,37 @@ export default function LoginPage() {
             <span className="text-gray-900 dark:text-white font-bold text-xl">Expenses</span>
           </div>
 
-          {step === 'credentials' ? (
+          {step === 'enroll' ? (
+            <EnrollFaceId
+              pendingToken={pendingToken}
+              onDone={() => navigate('/dashboard', { replace: true })}
+            />
+          ) : step === 'credentials' ? (
             <>
               <div className="mb-8">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in to your account to continue</p>
               </div>
+
+              {/* Face ID button — shown when username has a registered credential */}
+              {webAuthnSupported && hasFaceId && (
+                <>
+                  <button
+                    type="button"
+                    onClick={loginWithFaceId}
+                    disabled={faceLoading}
+                    className="w-full flex items-center justify-center gap-3 border border-gray-200 dark:border-gray-700 hover:border-emerald-400 dark:hover:border-emerald-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-white font-medium py-3.5 rounded-2xl text-sm transition-colors mb-5 disabled:opacity-60 shadow-sm"
+                  >
+                    <FaceIdIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                    {faceLoading ? 'Checking Face ID…' : 'Sign in with Face ID'}
+                  </button>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                    <span className="text-xs text-gray-400">or use password</span>
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                </>
+              )}
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div>
@@ -186,6 +315,8 @@ export default function LoginPage() {
                     {...register('username', { required: 'Username is required' })}
                     type="text"
                     autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
                     placeholder="Enter your username"
                     className={inputCls}
                   />

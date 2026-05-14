@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, Egg, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -50,60 +50,114 @@ export default function Sidebar({ onClose }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {links.map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to} end={to === '/dashboard'} className={linkClass} onClick={onClose}>
-            <Icon size={16} />
-            {label}
-          </NavLink>
-        ))}
+        {workspace === 'health' ? (
+          <>
+            <NavLink to="/health" end className={linkClass} onClick={onClose}>
+              <HeartPulse size={16} />
+              Overview
+            </NavLink>
+            <NavLink to="/health/meals" className={linkClass} onClick={onClose}>
+              <Receipt size={16} />
+              Meals
+            </NavLink>
+            <NavLink to="/health/water" className={linkClass} onClick={onClose}>
+              <Droplets size={16} />
+              Water
+            </NavLink>
+            <NavLink to="/health/weight" className={linkClass} onClick={onClose}>
+              <Scale size={16} />
+              Weight
+            </NavLink>
+          </>
+        ) : workspace === 'poultry' ? (
+          <>
+            <NavLink to="/poultry" end className={linkClass} onClick={onClose}>
+              <Bird size={16} />
+              Dashboard
+            </NavLink>
+            <NavLink to="/poultry/flock" className={linkClass} onClick={onClose}>
+              <Bird size={16} />
+              Batches
+            </NavLink>
+            <NavLink to="/poultry/expenses" className={linkClass} onClick={onClose}>
+              <ShoppingCart size={16} />
+              Expenses
+            </NavLink>
+            <NavLink to="/poultry/insights" className={linkClass} onClick={onClose}>
+              <BarChart2 size={16} />
+              Insights
+            </NavLink>
+            <NavLink to="/poultry/stake" className={linkClass} onClick={onClose}>
+              <PieChart size={16} />
+              Stake
+            </NavLink>
+            <NavLink to="/loans" className={linkClass} onClick={onClose}>
+              <CreditCard size={16} />
+              Loans
+            </NavLink>
+            <NavLink to="/poultry/uma-sbi" className={linkClass} onClick={onClose}>
+              <Landmark size={16} />
+              Uma SBI
+            </NavLink>
+          </>
+        ) : (
+          <>
+            {links.map(({ to, label, Icon }) => (
+              <NavLink key={to} to={to} end={to === '/dashboard'} className={linkClass} onClick={onClose}>
+                <Icon size={16} />
+                {label}
+              </NavLink>
+            ))}
 
-        {workspace === 'india' && (
-          <NavLink to="/savings" className={linkClass} onClick={onClose}>
-            <PiggyBank size={16} />
-            Savings
-          </NavLink>
-        )}
+            {workspace === 'india' && (
+              <NavLink to="/savings" className={linkClass} onClick={onClose}>
+                <PiggyBank size={16} />
+                Savings
+              </NavLink>
+            )}
 
-        {workspace === 'india' && (
-          <NavLink to="/lic" className={linkClass} onClick={onClose}>
-            <ShieldCheck size={16} />
-            LIC
-          </NavLink>
-        )}
+            {workspace === 'india' && (
+              <NavLink to="/lic" className={linkClass} onClick={onClose}>
+                <ShieldCheck size={16} />
+                LIC
+              </NavLink>
+            )}
 
-        {workspace === 'india' && (
-          <NavLink to="/india-list" className={linkClass} onClick={onClose}>
-            <ShoppingBag size={16} />
-            India List
-          </NavLink>
-        )}
+            {workspace === 'india' && (
+              <NavLink to="/india-list" className={linkClass} onClick={onClose}>
+                <ShoppingBag size={16} />
+                India List
+              </NavLink>
+            )}
 
-        {workspace !== 'india' && (
-          <NavLink to="/insights" className={linkClass} onClick={onClose}>
-            <Lightbulb size={16} />
-            Insights
-          </NavLink>
-        )}
+            {workspace !== 'india' && (
+              <NavLink to="/insights" className={linkClass} onClick={onClose}>
+                <Lightbulb size={16} />
+                Insights
+              </NavLink>
+            )}
 
-        {workspace !== 'india' && (
-          <NavLink to="/priority" className={linkClass} onClick={onClose}>
-            <ListOrdered size={16} />
-            Priority List
-          </NavLink>
-        )}
+            {workspace !== 'india' && (
+              <NavLink to="/priority" className={linkClass} onClick={onClose}>
+                <ListOrdered size={16} />
+                Priority List
+              </NavLink>
+            )}
 
-        {showHospital && workspace !== 'india' && (
-          <NavLink to="/hospital" className={linkClass} onClick={onClose}>
-            <HeartPulse size={16} />
-            Hospital
-          </NavLink>
-        )}
+            {showHospital && workspace !== 'india' && (
+              <NavLink to="/hospital" className={linkClass} onClick={onClose}>
+                <HeartPulse size={16} />
+                Hospital
+              </NavLink>
+            )}
 
-        {workspace !== 'india' && (
-          <NavLink to="/salary" className={linkClass} onClick={onClose}>
-            <Wallet size={16} />
-            Salary
-          </NavLink>
+            {workspace !== 'india' && (
+              <NavLink to="/salary" className={linkClass} onClick={onClose}>
+                <Wallet size={16} />
+                Salary
+              </NavLink>
+            )}
+          </>
         )}
 
         {isAdmin && (

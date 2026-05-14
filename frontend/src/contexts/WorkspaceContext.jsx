@@ -15,6 +15,18 @@ const WORKSPACE_CONFIG = {
     currency: 'USD',
     locale: 'en-US',
   },
+  health: {
+    label: 'Health & Diet',
+    flag: null,
+    currency: 'USD',
+    locale: 'en-US',
+  },
+  poultry: {
+    label: 'Poultry Farm',
+    flag: null,
+    currency: 'INR',
+    locale: 'en-IN',
+  },
 };
 
 export function WorkspaceProvider({ children }) {

@@ -391,6 +391,278 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_account_payments_account ON account_payments(account_id);
     CREATE INDEX IF NOT EXISTS idx_account_payments_user ON account_payments(user_id);
   `);
+
+  // Health & Diet
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS health_meals (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date       TEXT NOT NULL,
+      meal_type  TEXT NOT NULL DEFAULT 'snack',
+      name       TEXT NOT NULL,
+      calories   INTEGER NOT NULL DEFAULT 0,
+      protein_g  REAL NOT NULL DEFAULT 0,
+      carbs_g    REAL NOT NULL DEFAULT 0,
+      fat_g      REAL NOT NULL DEFAULT 0,
+      notes      TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_meals_user_date ON health_meals(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS health_water (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date       TEXT NOT NULL,
+      amount_ml  INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_water_user_date ON health_water(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS health_weight (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date       TEXT NOT NULL,
+      weight     REAL NOT NULL,
+      unit       TEXT NOT NULL DEFAULT 'kg',
+      notes      TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_weight_user_date ON health_weight(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS health_settings (
+      user_id        INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      calorie_goal   INTEGER NOT NULL DEFAULT 2000,
+      water_goal_ml  INTEGER NOT NULL DEFAULT 2000,
+      weight_unit    TEXT NOT NULL DEFAULT 'kg'
+    );
+  `);
+
+  // Poultry Farm
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS poultry_flock (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      bird_type  TEXT NOT NULL DEFAULT 'chicken',
+      count      INTEGER NOT NULL DEFAULT 0,
+      date_added TEXT NOT NULL,
+      notes      TEXT DEFAULT NULL,
+      is_active  INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_poultry_flock_user ON poultry_flock(user_id);
+  `);
+  try { db.exec("ALTER TABLE poultry_flock ADD COLUMN end_date TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE poultry_flock ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"); } catch {}
+  db.exec(`
+
+    CREATE TABLE IF NOT EXISTS poultry_mortality (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      flock_id   INTEGER REFERENCES poultry_flock(id) ON DELETE SET NULL,
+      date       TEXT NOT NULL,
+      count      INTEGER NOT NULL DEFAULT 0,
+      cause      TEXT DEFAULT NULL,
+      notes      TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_poultry_mortality_user_date ON poultry_mortality(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS poultry_expenses (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date        TEXT NOT NULL,
+      category    TEXT NOT NULL DEFAULT 'feed',
+      description TEXT NOT NULL,
+      amount      REAL NOT NULL,
+      notes       TEXT DEFAULT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_poultry_expenses_user_date ON poultry_expenses(user_id, date);
+
+    CREATE TABLE IF NOT EXISTS poultry_sales (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date        TEXT NOT NULL,
+      sale_type   TEXT NOT NULL DEFAULT 'eggs',
+      quantity    REAL NOT NULL DEFAULT 0,
+      unit        TEXT NOT NULL DEFAULT 'dozen',
+      price       REAL NOT NULL DEFAULT 0,
+      total       REAL NOT NULL DEFAULT 0,
+      buyer       TEXT DEFAULT NULL,
+      notes       TEXT DEFAULT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_poultry_sales_user_date ON poultry_sales(user_id, date);
+  `);
+
+  // Poultry Bills (rearing charge vouchers)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS poultry_bills (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      flock_id          INTEGER NOT NULL REFERENCES poultry_flock(id) ON DELETE CASCADE,
+      user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      image_path        TEXT DEFAULT NULL,
+      -- Voucher info
+      voucher_no        TEXT DEFAULT NULL,
+      bill_date         TEXT DEFAULT NULL,
+      hatch_date        TEXT DEFAULT NULL,
+      farmer_name       TEXT DEFAULT NULL,
+      -- Production metrics
+      chick_housed      INTEGER DEFAULT NULL,
+      mean_age          REAL DEFAULT NULL,
+      day_gain          REAL DEFAULT NULL,
+      mortality         INTEGER DEFAULT NULL,
+      mortality_pct     REAL DEFAULT NULL,
+      first_wk_mort_pct REAL DEFAULT NULL,
+      bird_sold_no      INTEGER DEFAULT NULL,
+      bird_sold_kgs     REAL DEFAULT NULL,
+      feed_cons_kgs     REAL DEFAULT NULL,
+      avg_body_wt       REAL DEFAULT NULL,
+      fcr               REAL DEFAULT NULL,
+      converted_fcr     REAL DEFAULT NULL,
+      eef               REAL DEFAULT NULL,
+      grade             TEXT DEFAULT NULL,
+      standard_rc       REAL DEFAULT NULL,
+      std_prod_cost     REAL DEFAULT NULL,
+      basic_gc_amt      REAL DEFAULT NULL,
+      -- Costs (total + Rs/Kg)
+      chick_cost        REAL DEFAULT NULL,
+      chick_rs_kg       REAL DEFAULT NULL,
+      feed_cost         REAL DEFAULT NULL,
+      feed_rs_kg        REAL DEFAULT NULL,
+      medicine_cost     REAL DEFAULT NULL,
+      medicine_rs_kg    REAL DEFAULT NULL,
+      vaccine_cost      REAL DEFAULT NULL,
+      vaccine_rs_kg     REAL DEFAULT NULL,
+      admin_cost        REAL DEFAULT NULL,
+      admin_rs_kg       REAL DEFAULT NULL,
+      overhead_cost     REAL DEFAULT NULL,
+      prod_cost_total   REAL DEFAULT NULL,
+      prod_cost_rs_kg   REAL DEFAULT NULL,
+      ern_rc_kg         REAL DEFAULT NULL,
+      -- Financials
+      avg_sale_rate     REAL DEFAULT NULL,
+      prod_reco         REAL DEFAULT NULL,
+      mort_reco         REAL DEFAULT NULL,
+      fcr_reco          REAL DEFAULT NULL,
+      bird_sh_rec       REAL DEFAULT NULL,
+      total_rc          REAL DEFAULT NULL,
+      tds               REAL DEFAULT NULL,
+      net_pay           REAL DEFAULT NULL,
+      raw_text          TEXT DEFAULT NULL,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_poultry_bills_flock ON poultry_bills(flock_id);
+    CREATE INDEX IF NOT EXISTS idx_poultry_bills_user ON poultry_bills(user_id);
+  `);
+
+  // Add flock_id and paid_by to poultry_expenses if not present
+  try { db.exec(`ALTER TABLE poultry_farm_assets ADD COLUMN acres REAL NOT NULL DEFAULT 0`); } catch {}
+  try { db.exec(`ALTER TABLE poultry_bills ADD COLUMN prod_incent REAL DEFAULT NULL`); } catch {}
+  try { db.exec(`ALTER TABLE poultry_bills ADD COLUMN mort_inc REAL DEFAULT NULL`); } catch {}
+  try { db.exec(`ALTER TABLE poultry_expenses ADD COLUMN flock_id INTEGER REFERENCES poultry_flock(id) ON DELETE SET NULL`); } catch {}
+  try { db.exec(`ALTER TABLE poultry_expenses ADD COLUMN paid_by TEXT DEFAULT NULL`); } catch {}
+  try { db.exec(`ALTER TABLE poultry_expenses ADD COLUMN section TEXT DEFAULT NULL`); } catch {}
+  try { db.exec(`ALTER TABLE poultry_expenses ADD COLUMN subcategory TEXT DEFAULT NULL`); } catch {}
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS poultry_farm_assets (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      land_value  REAL NOT NULL DEFAULT 0,
+      shed_value  REAL NOT NULL DEFAULT 0,
+      acres       REAL NOT NULL DEFAULT 0,
+      notes       TEXT DEFAULT NULL,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS poultry_stake (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name           TEXT NOT NULL,
+      percentage     REAL NOT NULL DEFAULT 0,
+      invested       REAL NOT NULL DEFAULT 0,
+      notes          TEXT DEFAULT NULL,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_poultry_stake_user ON poultry_stake(user_id);
+  `);
+
+  // Loans
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS loans (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      loan_type        TEXT NOT NULL,
+      ref_no           TEXT,
+      total_amount     REAL NOT NULL,
+      future_amount    REAL,
+      future_interest  REAL,
+      future_principal REAL,
+      monthly_payment  REAL,
+      interest_rate    REAL,
+      time_period      INTEGER,
+      maturity_date    TEXT,
+      start_date       TEXT,
+      paid_amount      REAL NOT NULL DEFAULT 0,
+      notes            TEXT,
+      sort_order       INTEGER NOT NULL DEFAULT 0,
+      created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_loans_user ON loans(user_id);
+  `);
+
+  try { db.exec(`ALTER TABLE loans ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`); } catch {}
+
+  // Seed loan data from CSV if table is empty
+  const adminUser = db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get();
+  if (adminUser) {
+    const loanCount = db.prepare('SELECT COUNT(*) AS c FROM loans WHERE user_id = ?').get(adminUser.id).c;
+    if (loanCount === 0) {
+      const insertLoan = db.prepare(`
+        INSERT INTO loans (user_id, loan_type, ref_no, total_amount, future_amount, future_interest,
+          future_principal, monthly_payment, interest_rate, time_period, maturity_date, start_date,
+          paid_amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const loans = [
+        ['LIC Housing loan', '7002050001081', 3400000, 4973930, 1662081.61, 3311848.39, 43995, 9.25, 119, '2035-10-01', '2025-10-03', 0, 1],
+        ['LIC Housing loan', '7002050001094', 600000,  851300,  264442.93,  586857.07,  7400,  8.25, 120, '2035-10-03', '2025-10-04', 500000, 2],
+        ['SBI Gold loan',    null,            876079,  null,    null,       null,       null,  9,    null, null,        null,        0, 3],
+        ['LIC Housing loan', '720500000225',  1500000, 949134,  152857.20,  796276.80,  22524, 10.1, 100, '2029-10-02', '2020-10-11', 0, 4],
+        ['LIC Housing loan', '720500000226',  1200000, 727626,  111552.33,  616073.67,  16430, 9.1,  102, '2029-10-04', '2020-10-11', 561163, 5],
+      ];
+      loans.forEach(l => insertLoan.run(adminUser.id, ...l));
+    }
+  }
+  // WebAuthn / Face ID credentials
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webauthn_credentials (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      credential_id TEXT NOT NULL UNIQUE,
+      public_key    TEXT NOT NULL,
+      counter       INTEGER NOT NULL DEFAULT 0,
+      created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_webauthn_user ON webauthn_credentials(user_id);
+  `);
+
+  // Uma SBI ledger
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS uma_sbi (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      amount      REAL NOT NULL,
+      date        TEXT NOT NULL DEFAULT (date('now')),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_uma_sbi_user ON uma_sbi(user_id);
+  `);
 }
 
 module.exports = { runMigrations };
