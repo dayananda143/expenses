@@ -84,6 +84,92 @@ function QuickPaymentModal({ account, onClose }) {
   );
 }
 
+function CarFinancePaymentModal({ onClose }) {
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const [amount, setAmount] = useState('');
+  const [date, setDate]     = useState(todayStr);
+  const [error, setError]   = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const amt = parseFloat(amount);
+    const cfg = JSON.parse(localStorage.getItem('car_finance_config') || '{}');
+    if (!amt || amt <= 0)              { setError('Enter a valid amount.');           return; }
+    if (!date)                         { setError('Select a date.');                  return; }
+    if (amt > (cfg.remainingAmount ?? 0)) { setError('Amount exceeds remaining balance.'); return; }
+
+    const nextConfig = {
+      ...cfg,
+      remainingAmount: Math.max(0, (cfg.remainingAmount ?? 0) - amt),
+      remainingMonths: Math.max(0, (cfg.remainingMonths ?? 0) - 1),
+    };
+    const existing = JSON.parse(localStorage.getItem('car_finance_payments') || '[]');
+    const nextPayments = [{ id: Date.now(), date, amount: amt }, ...existing];
+    localStorage.setItem('car_finance_config', JSON.stringify(nextConfig));
+    localStorage.setItem('car_finance_payments', JSON.stringify(nextPayments));
+    onClose();
+  }
+
+  const cfg = JSON.parse(localStorage.getItem('car_finance_config') || '{}');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm shadow-xl">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+              <Car size={16} className="text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Car Finance</p>
+              <p className="text-xs text-rose-500 font-medium">{fmtUSD(cfg.remainingAmount ?? 0)} remaining</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Amount (USD)</label>
+              <input
+                type="number" step="0.01" min="0.01"
+                placeholder="0.00"
+                autoFocus
+                value={amount}
+                onChange={e => { setAmount(e.target.value); setError(''); }}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => { setDate(e.target.value); setError(''); }}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-500 -mt-2">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-emerald-700 transition-colors"
+            >
+              Record Payment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 flex items-start gap-4">
@@ -288,6 +374,7 @@ export default function AccountsDashboard() {
   const { data: acctData, isLoading: acctLoading } = useAccounts(WS);
   const { data: pmtData, isLoading: pmtLoading } = useAccountPayments();
   const [payingAccount, setPayingAccount] = useState(null);
+  const [carPaymentOpen, setCarPaymentOpen] = useState(false);
 
   const accounts = acctData?.data ?? [];
   const payments = pmtData?.data ?? [];
@@ -377,7 +464,7 @@ export default function AccountsDashboard() {
                     a.days === 1 ? 'Due tomorrow' :
                                    `Due in ${a.days}d (${fmtDate(a.dueDate)})`;
                   return (
-                    <Link key="__car__" to="/accounts/car-finance" className="flex items-center justify-between gap-3 px-2 py-2 -mx-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+                    <button key="__car__" onClick={() => setCarPaymentOpen(true)} className="w-full flex items-center justify-between gap-3 px-2 py-2 -mx-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left group">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
                           <Car size={14} className="text-violet-600 dark:text-violet-400" />
@@ -390,7 +477,7 @@ export default function AccountsDashboard() {
                       <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${cls}`}>
                         <Calendar size={10} />{label}
                       </span>
-                    </Link>
+                    </button>
                   );
                 }
                 return isAdmin ? (
@@ -462,6 +549,9 @@ export default function AccountsDashboard() {
         <AccountsBreakdown savings={allSavings} credits={allCredits} />
       )}
 
+      {carPaymentOpen && (
+        <CarFinancePaymentModal onClose={() => setCarPaymentOpen(false)} />
+      )}
       {payingAccount && (
         <QuickPaymentModal account={payingAccount} onClose={() => setPayingAccount(null)} />
       )}
