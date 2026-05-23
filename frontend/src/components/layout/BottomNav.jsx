@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Receipt, Lightbulb, ListOrdered, PiggyBank, ShieldCheck,
-  HeartPulse, Droplets, Scale, Bird, ShoppingCart, BarChart2, Menu,
+  HeartPulse, Droplets, Scale, Bird, ShoppingCart, BarChart2, Menu, Stethoscope,
 } from 'lucide-react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -30,12 +30,15 @@ const NAV_BY_WORKSPACE = {
     { to: '/poultry/expenses', label: 'Expenses', Icon: ShoppingCart },
     { to: '/poultry/insights', label: 'Insights', Icon: BarChart2 },
   ],
+  hospital: [
+    { to: '/hospital', label: 'Hospital', Icon: Stethoscope, end: true },
+  ],
 };
 
 export default function BottomNav({ onMenuClick }) {
   const { workspace } = useWorkspace();
   const nav = NAV_BY_WORKSPACE[workspace] ?? NAV_BY_WORKSPACE.us;
-  const showMore = workspace !== 'health';
+  const showMore = workspace !== 'health' && workspace !== 'hospital';
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-stretch justify-around"

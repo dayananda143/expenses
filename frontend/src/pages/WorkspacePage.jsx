@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Sun, Moon, CreditCard, LogOut, TrendingUp, PiggyBank, ArrowRight, Landmark, HeartPulse, Bird } from 'lucide-react';
+import { Sun, Moon, CreditCard, LogOut, TrendingUp, PiggyBank, ArrowRight, Landmark, HeartPulse, Bird, Stethoscope } from 'lucide-react';
 import { US, IN } from 'country-flag-icons/react/3x2';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
@@ -62,6 +62,7 @@ const TILE_STYLES = {
   accounts: { gradient: 'from-violet-500 to-purple-600',  glow: 'shadow-violet-200 dark:shadow-violet-900/30', border: 'hover:border-violet-400 dark:hover:border-violet-500' },
   health:   { gradient: 'from-rose-400 to-pink-600',      glow: 'shadow-rose-200 dark:shadow-rose-900/30',     border: 'hover:border-rose-400 dark:hover:border-rose-500'     },
   poultry:  { gradient: 'from-amber-400 to-orange-500',   glow: 'shadow-amber-200 dark:shadow-amber-900/30',   border: 'hover:border-amber-400 dark:hover:border-amber-500'   },
+  hospital: { gradient: 'from-red-500 to-rose-600',       glow: 'shadow-red-200 dark:shadow-red-900/30',       border: 'hover:border-red-400 dark:hover:border-red-500'       },
 };
 
 export default function WorkspacePage() {
@@ -70,14 +71,15 @@ export default function WorkspacePage() {
   const { dark, toggle } = useTheme();
   const navigate = useNavigate();
 
-  const allowed = user?.is_admin ? ['india', 'us', 'health', 'poultry'] : (user?.workspaces ?? []);
+  const baseAllowed = user?.is_admin ? ['india', 'us', 'health', 'poultry'] : (user?.workspaces ?? []);
+  const allowed = (user?.is_admin || user?.hospital_access) ? [...new Set([...baseAllowed, 'hospital'])] : baseAllowed;
 
   function enterWorkspace(ws) {
     selectWorkspace(ws);
     navigate('/dashboard', { replace: true });
   }
 
-  const WS_ICONS = { health: HeartPulse, poultry: Bird };
+  const WS_ICONS = { health: HeartPulse, poultry: Bird, hospital: Stethoscope };
 
   const tiles = [
     ...allowed.map(ws => ({

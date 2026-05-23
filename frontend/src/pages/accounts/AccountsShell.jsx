@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark, ScanFace } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark, ScanFace, Car } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ChangePasswordModal from '../../components/auth/ChangePasswordModal';
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/accounts/savings',       label: 'Savings',        Icon: PiggyBank },
   { to: '/accounts/credit-cards',  label: 'Credit Cards',   Icon: CreditCard },
   { to: '/accounts/payments',      label: 'Payments',       Icon: Receipt },
+  { to: '/accounts/car-finance',   label: 'Car Finance',    Icon: Car },
 ];
 
 function NavItem({ to, label, Icon, onClick }) {

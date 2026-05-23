@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, Egg, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -11,9 +11,9 @@ const allLinks = [
 
 const adminLinks = [
   { to: '/users',                label: 'Users',               Icon: Users  },
-  { to: '/categories',           label: 'Categories',          Icon: Tag,         indiaHide: true },
-  { to: '/hospital-categories',  label: 'Hospital Categories', Icon: Stethoscope, indiaHide: true },
-  { to: '/budgets',              label: 'Budgets',             Icon: Target,      indiaHide: true },
+  { to: '/categories',           label: 'Categories',          Icon: Tag,         indiaHide: true,  hospitalHide: true },
+  { to: '/hospital-categories',  label: 'Hospital Categories', Icon: Stethoscope, hospitalOnly: true },
+  { to: '/budgets',              label: 'Budgets',             Icon: Target,      indiaHide: true,  hospitalHide: true },
 ];
 
 export default function Sidebar({ onClose }) {
@@ -21,8 +21,11 @@ export default function Sidebar({ onClose }) {
   const { workspace } = useWorkspace();
   const isAdmin = !!user?.is_admin;
   const links = allLinks.filter(l => !(l.indiaHide && workspace === 'india'));
-  const visibleAdminLinks = adminLinks.filter(l => !(l.indiaHide && workspace === 'india'));
-  const showHospital = user?.is_admin || user?.hospital_access;
+  const visibleAdminLinks = adminLinks.filter(l =>
+    !(l.indiaHide && workspace === 'india') &&
+    !(l.hospitalHide && workspace === 'hospital') &&
+    !(l.hospitalOnly && workspace !== 'hospital')
+  );
 
   const linkClass = ({ isActive }) =>
     clsx(
@@ -68,6 +71,13 @@ export default function Sidebar({ onClose }) {
             <NavLink to="/health/weight" className={linkClass} onClick={onClose}>
               <Scale size={16} />
               Weight
+            </NavLink>
+          </>
+        ) : workspace === 'hospital' ? (
+          <>
+            <NavLink to="/hospital" end className={linkClass} onClick={onClose}>
+              <Stethoscope size={16} />
+              Hospital
             </NavLink>
           </>
         ) : workspace === 'poultry' ? (
@@ -142,13 +152,6 @@ export default function Sidebar({ onClose }) {
               <NavLink to="/priority" className={linkClass} onClick={onClose}>
                 <ListOrdered size={16} />
                 Priority List
-              </NavLink>
-            )}
-
-            {showHospital && workspace !== 'india' && (
-              <NavLink to="/hospital" className={linkClass} onClick={onClose}>
-                <HeartPulse size={16} />
-                Hospital
               </NavLink>
             )}
 

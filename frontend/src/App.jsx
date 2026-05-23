@@ -9,6 +9,7 @@ import AccountsDashboard from './pages/accounts/AccountsDashboard';
 import SavingsPage from './pages/accounts/SavingsPage';
 import CreditCardsPage from './pages/accounts/CreditCardsPage';
 import PaymentsPage from './pages/accounts/PaymentsPage';
+import CarFinancePage from './pages/accounts/CarFinancePage';
 import DashboardPage from './pages/DashboardPage';
 import InsightsPage from './pages/InsightsPage';
 import PriorityPage from './pages/PriorityPage';
@@ -54,6 +55,7 @@ function DashboardRoute() {
   const { workspace } = useWorkspace();
   if (workspace === 'health') return <Navigate to="/health" replace />;
   if (workspace === 'poultry') return <Navigate to="/poultry" replace />;
+  if (workspace === 'hospital') return <Navigate to="/hospital" replace />;
   return <DashboardPage />;
 }
 
@@ -74,7 +76,8 @@ export default function App() {
           <Route path="dashboard"    element={<AccountsDashboard />} />
           <Route path="savings"      element={<SavingsPage />} />
           <Route path="credit-cards" element={<CreditCardsPage />} />
-          <Route path="payments"     element={<PaymentsPage />} />
+          <Route path="payments"      element={<PaymentsPage />} />
+          <Route path="car-finance"  element={<CarFinancePage />} />
         </Route>
 
         <Route element={<WorkspaceRoute />}>

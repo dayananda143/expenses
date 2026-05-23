@@ -27,6 +27,12 @@ const WORKSPACE_CONFIG = {
     currency: 'INR',
     locale: 'en-IN',
   },
+  hospital: {
+    label: 'Hospital',
+    flag: null,
+    currency: 'USD',
+    locale: 'en-US',
+  },
 };
 
 export function WorkspaceProvider({ children }) {

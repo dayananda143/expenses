@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X, GripVertical } from 'lucide-react';
+import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X, GripVertical, Car } from 'lucide-react';
 import { useAccounts, useReorderAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
-import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal, AccountModal, BankLogo } from './shared';
+import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, fmtDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal, AccountModal, BankLogo } from './shared';
 
 const inputCls = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors';
 const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide';
@@ -301,15 +301,26 @@ export default function AccountsDashboard() {
   const allCredits = activeAccounts.filter((a) => a.type === 'credit');
 
   const upcomingDue = useMemo(() => {
-    return allCredits
+    const credits = allCredits
       .filter((a) => a.due_day)
       .map((a) => {
         const due = nextDueDate(a.due_day, a.last_paid_date);
         const days = daysFromToday(due);
-        return { ...a, due, days };
+        return { ...a, due, days, _type: 'credit' };
       })
-      .filter((a) => a.days !== null && a.days <= 30)
-      .sort((a, b) => a.days - b.days);
+      .filter((a) => a.days !== null && a.days <= 30);
+
+    try {
+      const cf = JSON.parse(localStorage.getItem('car_finance_config') || '{}');
+      if (cf.dueDate) {
+        const days = daysFromToday(cf.dueDate);
+        if (days !== null && days <= 30) {
+          credits.push({ _type: 'car', id: '__car__', name: 'Car Finance', dueDate: cf.dueDate, days, remainingAmount: cf.remainingAmount ?? 0 });
+        }
+      }
+    } catch {}
+
+    return credits.sort((a, b) => a.days - b.days);
   }, [allCredits]);
 
   const recentPayments = payments.slice(0, 5);
@@ -354,8 +365,35 @@ export default function AccountsDashboard() {
             <p className="text-sm text-gray-400 text-center py-6">No payments due in the next 30 days</p>
           ) : (
             <div className="space-y-2">
-              {upcomingDue.map((a) => (
-                isAdmin ? (
+              {upcomingDue.map((a) => {
+                if (a._type === 'car') {
+                  const cls =
+                    a.days <= 3 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
+                    a.days <= 7 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
+                                  'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700';
+                  const label =
+                    a.days < 0   ? `Overdue ${Math.abs(a.days)}d` :
+                    a.days === 0 ? 'Due today' :
+                    a.days === 1 ? 'Due tomorrow' :
+                                   `Due in ${a.days}d (${fmtDate(a.dueDate)})`;
+                  return (
+                    <Link key="__car__" to="/accounts/car-finance" className="flex items-center justify-between gap-3 px-2 py-2 -mx-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                          <Car size={14} className="text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Car Finance</p>
+                          <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.remainingAmount)} remaining</p>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${cls}`}>
+                        <Calendar size={10} />{label}
+                      </span>
+                    </Link>
+                  );
+                }
+                return isAdmin ? (
                   <button
                     key={a.id}
                     onClick={() => setPayingAccount(a)}
@@ -382,8 +420,8 @@ export default function AccountsDashboard() {
                     </div>
                     <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
                   </div>
-                )
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
