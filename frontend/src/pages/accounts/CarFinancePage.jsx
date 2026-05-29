@@ -8,7 +8,7 @@ function loadConfig() {
   try { const r = localStorage.getItem(CONFIG_KEY); if (r) return JSON.parse(r); } catch {}
   return { totalAmount: 0, remainingAmount: 0, remainingMonths: 0, dueDate: '' };
 }
-function saveConfig(d) { localStorage.setItem(CONFIG_KEY, JSON.stringify(d)); }
+function saveConfig(d) { localStorage.setItem(CONFIG_KEY, JSON.stringify(d)); window.dispatchEvent(new CustomEvent('carFinanceUpdated')); }
 
 function loadPayments() {
   try { const r = localStorage.getItem(PAYMENTS_KEY); if (r) return JSON.parse(r); } catch {}
@@ -92,10 +92,25 @@ export default function CarFinancePage() {
     if (!payDate)                         { setPayError('Select a date.');                  return; }
     if (amount > config.remainingAmount)  { setPayError('Amount exceeds remaining balance.'); return; }
 
+    let nextDueDate = config.dueDate;
+    if (config.dueDate) {
+      const day = parseInt(config.dueDate.split('-')[2]);
+      const paid = new Date(payDate + 'T00:00:00');
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thisMonthDue = new Date(now.getFullYear(), now.getMonth(), day);
+      const baseDue = thisMonthDue >= today ? thisMonthDue : new Date(now.getFullYear(), now.getMonth() + 1, day);
+      const cycleStart = new Date(baseDue.getFullYear(), baseDue.getMonth() - 1, day);
+      const next = paid >= cycleStart
+        ? new Date(baseDue.getFullYear(), baseDue.getMonth() + 1, day)
+        : baseDue;
+      nextDueDate = next.toLocaleDateString('en-CA');
+    }
     const nextConfig = {
       ...config,
       remainingAmount: Math.max(0, config.remainingAmount - amount),
       remainingMonths: Math.max(0, config.remainingMonths - 1),
+      dueDate: nextDueDate,
     };
     const newPayment = { id: Date.now(), date: payDate, amount };
     const nextPayments = [newPayment, ...payments];

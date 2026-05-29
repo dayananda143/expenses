@@ -47,6 +47,15 @@ export function useArchivePriorityItem() {
   });
 }
 
+export function useFutureWorkItem() {
+  const qc = useQueryClient();
+  const { workspace } = useWorkspace();
+  return useMutation({
+    mutationFn: (id) => client.patch(`/priority/${id}/future`, {}, { params: { workspace } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['priority', workspace] }),
+  });
+}
+
 export function useReorderPriority() {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();

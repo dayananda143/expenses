@@ -344,6 +344,9 @@ function runMigrations(db) {
   try {
     db.exec(`ALTER TABLE priority_items ADD COLUMN archived_at TEXT DEFAULT NULL`);
   } catch {}
+  try {
+    db.exec(`ALTER TABLE priority_items ADD COLUMN is_future INTEGER NOT NULL DEFAULT 0`);
+  } catch {}
 
   // Lent items
   db.exec(`
@@ -675,6 +678,23 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_uma_sbi_user ON uma_sbi(user_id);
   `);
+
+  // Trips
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trips (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace   TEXT NOT NULL DEFAULT 'us',
+      name        TEXT NOT NULL,
+      destination TEXT DEFAULT NULL,
+      start_date  TEXT DEFAULT NULL,
+      end_date    TEXT DEFAULT NULL,
+      notes       TEXT DEFAULT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id);
+  `);
+  try { db.exec("ALTER TABLE expenses ADD COLUMN trip_id INTEGER DEFAULT NULL REFERENCES trips(id) ON DELETE SET NULL"); } catch {}
 }
 
 module.exports = { runMigrations };

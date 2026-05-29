@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope, Plane, TableProperties } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -75,9 +75,13 @@ export default function Sidebar({ onClose }) {
           </>
         ) : workspace === 'hospital' ? (
           <>
+            <NavLink to="/hospital-dashboard" className={linkClass} onClick={onClose}>
+              <LayoutDashboard size={16} />
+              Dashboard
+            </NavLink>
             <NavLink to="/hospital" end className={linkClass} onClick={onClose}>
-              <Stethoscope size={16} />
-              Hospital
+              <TableProperties size={16} />
+              Expenses
             </NavLink>
           </>
         ) : workspace === 'poultry' ? (
@@ -152,6 +156,13 @@ export default function Sidebar({ onClose }) {
               <NavLink to="/priority" className={linkClass} onClick={onClose}>
                 <ListOrdered size={16} />
                 Priority List
+              </NavLink>
+            )}
+
+            {workspace !== 'india' && (
+              <NavLink to="/trips" className={linkClass} onClick={onClose}>
+                <Plane size={16} />
+                Trips
               </NavLink>
             )}
 

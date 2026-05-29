@@ -68,6 +68,17 @@ export function useHospitalSummary(year, user_id) {
   });
 }
 
+export function useHospitalDashboard(year) {
+  return useQuery({
+    queryKey: ['hospital-dashboard', year],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (year) params.set('year', year);
+      return client.get(`${BASE}/dashboard?${params.toString()}`);
+    },
+  });
+}
+
 export function useHospitalUsers() {
   return useQuery({
     queryKey: ['hospital-users'],

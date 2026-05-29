@@ -194,6 +194,73 @@ router.delete('/:id', (req, res, next) => {
   }
 });
 
+// GET /api/hospital-expenses/dashboard
+router.get('/dashboard', (req, res, next) => {
+  try {
+    const now = new Date();
+    const year = parseInt(req.query.year) || now.getFullYear();
+    const yearStr = String(year);
+    const lastYearStr = String(year - 1);
+
+    const scopeWhere  = '1=1';
+    const scopeParams = [];
+
+    const yearTotal = db.prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS visits FROM hospital_expenses WHERE ${scopeWhere} AND strftime('%Y', date) = ?`
+    ).get(...scopeParams, yearStr);
+
+    const lastYearTotal = db.prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS visits FROM hospital_expenses WHERE ${scopeWhere} AND strftime('%Y', date) = ?`
+    ).get(...scopeParams, lastYearStr);
+
+    const allTime = db.prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS visits FROM hospital_expenses WHERE ${scopeWhere}`
+    ).get(...scopeParams);
+
+    const monthly = db.prepare(
+      `SELECT strftime('%m', date) AS month, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS visits
+       FROM hospital_expenses WHERE ${scopeWhere} AND strftime('%Y', date) = ?
+       GROUP BY month ORDER BY month ASC`
+    ).all(...scopeParams, yearStr);
+
+    const byCategory = db.prepare(
+      `SELECT hc.name AS category_name, hc.color AS category_color,
+              COALESCE(SUM(h.amount), 0) AS total, COUNT(*) AS visits
+       FROM hospital_expenses h
+       LEFT JOIN hospital_categories hc ON hc.id = h.category_id
+       WHERE ${scopeWhere.replace(/h\./g, '')}
+       GROUP BY h.category_id ORDER BY total DESC`
+    ).all(...scopeParams);
+
+    const byPerson = db.prepare(
+      `SELECT u.username, COALESCE(SUM(h.amount), 0) AS total, COUNT(*) AS visits
+       FROM hospital_expenses h
+       LEFT JOIN users u ON u.id = h.user_id
+       WHERE 1=1
+       GROUP BY h.user_id ORDER BY total DESC`
+    ).all();
+
+    const byHospital = db.prepare(
+      `SELECT COALESCE(hospital, 'Unknown') AS hospital,
+              COALESCE(SUM(amount), 0) AS total, COUNT(*) AS visits
+       FROM hospital_expenses WHERE ${scopeWhere}
+       GROUP BY hospital ORDER BY total DESC LIMIT 6`
+    ).all(...scopeParams);
+
+    const topExpenses = db.prepare(
+      `SELECT h.id, h.description, h.amount, h.date, h.hospital,
+              u.username, hc.name AS category_name, hc.color AS category_color
+       FROM hospital_expenses h
+       LEFT JOIN users u ON u.id = h.user_id
+       LEFT JOIN hospital_categories hc ON hc.id = h.category_id
+       WHERE h.amount IS NOT NULL
+       ORDER BY h.amount DESC LIMIT 5`
+    ).all();
+
+    res.json({ yearTotal: yearTotal.total, yearVisits: yearTotal.visits, lastYearTotal: lastYearTotal.total, lastYearVisits: lastYearTotal.visits, allTimeTotal: allTime.total, allTimeVisits: allTime.visits, monthly, byCategory, byPerson, byHospital, topExpenses, year });
+  } catch (err) { next(err); }
+});
+
 // GET /api/hospital-expenses/summary
 router.get('/summary', (req, res, next) => {
   try {

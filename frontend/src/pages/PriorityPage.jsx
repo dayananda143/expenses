@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, Target, Archive, ArchiveX, ChevronDown, ChevronUp } from 'lucide-react';
-import { usePriority, useCreatePriorityItem, useUpdatePriorityItem, useDeletePriorityItem, useReorderPriority, useArchivePriorityItem } from '../hooks/usePriority';
+import { Plus, Pencil, Trash2, X, GripVertical, Target, Archive, ArchiveX, ChevronDown, ChevronUp, Clock, ClockArrowUp } from 'lucide-react';
+import { usePriority, useCreatePriorityItem, useUpdatePriorityItem, useDeletePriorityItem, useReorderPriority, useArchivePriorityItem, useFutureWorkItem } from '../hooks/usePriority';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import { useToast } from '../contexts/ToastContext';
@@ -71,30 +71,33 @@ function ItemModal({ item, onClose }) {
   );
 }
 
-function PriorityCard({ item, idx, onEdit, onDelete, onArchive, onDragStart, onDragOver, onDrop, fmt, isArchived }) {
+function PriorityCard({ item, idx, onEdit, onDelete, onArchive, onFuture, onDragStart, onDragOver, onDrop, fmt, isArchived, isFuture }) {
   const pct = Math.min((item.saved / item.budget) * 100, 100);
   const remaining = item.budget - item.saved;
   const done = item.saved >= item.budget;
+  const isInactive = isArchived || isFuture;
 
   return (
     <div
-      draggable={!isArchived}
-      onDragStart={() => !isArchived && onDragStart(item.id)}
-      onDragOver={(e) => !isArchived && onDragOver(e, item.id)}
-      onDrop={() => !isArchived && onDrop()}
+      draggable={!isInactive}
+      onDragStart={() => !isInactive && onDragStart(item.id)}
+      onDragOver={(e) => !isInactive && onDragOver(e, item.id)}
+      onDrop={() => !isInactive && onDrop()}
       className={`bg-white dark:bg-gray-900 rounded-xl border p-4 flex gap-3 group transition-opacity ${
-        isArchived ? 'border-gray-100 dark:border-gray-800 opacity-70' : 'border-gray-200 dark:border-gray-700'
+        isInactive ? 'border-gray-100 dark:border-gray-800 opacity-70' : 'border-gray-200 dark:border-gray-700'
       }`}
     >
       {/* Drag handle + rank */}
       <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
-        {!isArchived && (
+        {!isInactive && (
           <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400">
             <GripVertical size={16} />
           </div>
         )}
         {isArchived
           ? <Archive size={14} className="text-gray-300 dark:text-gray-600" />
+          : isFuture
+          ? <Clock size={14} className="text-blue-300 dark:text-blue-600" />
           : <span className="text-xs font-bold text-gray-300 dark:text-gray-600">#{idx + 1}</span>
         }
       </div>
@@ -112,6 +115,15 @@ function PriorityCard({ item, idx, onEdit, onDelete, onArchive, onDragStart, onD
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isArchived && (
+              <button
+                onClick={() => onFuture(item)}
+                title={isFuture ? 'Move back to active' : 'Move to Future Work'}
+                className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                {isFuture ? <ClockArrowUp size={13} /> : <Clock size={13} />}
+              </button>
+            )}
             <button
               onClick={() => onArchive(item)}
               title={isArchived ? 'Unarchive' : 'Archive'}
@@ -119,7 +131,7 @@ function PriorityCard({ item, idx, onEdit, onDelete, onArchive, onDragStart, onD
             >
               {isArchived ? <ArchiveX size={13} /> : <Archive size={13} />}
             </button>
-            {!isArchived && (
+            {!isInactive && (
               <button onClick={() => onEdit(item)} className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
                 <Pencil size={13} />
               </button>
@@ -159,6 +171,7 @@ export default function PriorityPage() {
   const { data, isLoading } = usePriority();
   const deleteItem = useDeletePriorityItem();
   const archiveItem = useArchivePriorityItem();
+  const futureItem = useFutureWorkItem();
   const reorder = useReorderPriority();
 
   const [showModal, setShowModal] = useState(false);
@@ -166,11 +179,13 @@ export default function PriorityPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [showFuture, setShowFuture] = useState(false);
   const dragId = useRef(null);
 
   const allItems    = data?.data ?? [];
-  const activeItems = allItems.filter((i) => !i.archived);
+  const activeItems = allItems.filter((i) => !i.archived && !i.is_future);
   const archivedItems = allItems.filter((i) => i.archived);
+  const futureItems = allItems.filter((i) => i.is_future && !i.archived);
 
   const serverItems = activeItems;
   const items = localOrder
@@ -219,6 +234,13 @@ export default function PriorityPage() {
       await archiveItem.mutateAsync(item.id);
       toast(item.archived ? 'Item unarchived' : 'Item archived');
     } catch (err) { toast(err?.error ?? 'Failed to archive', 'error'); }
+  }
+
+  async function handleFuture(item) {
+    try {
+      await futureItem.mutateAsync(item.id);
+      toast(item.is_future ? 'Moved back to active' : 'Moved to Future Work');
+    } catch (err) { toast(err?.error ?? 'Failed to update', 'error'); }
   }
 
   return (
@@ -271,14 +293,51 @@ export default function PriorityPage() {
               idx={idx}
               fmt={fmt}
               isArchived={false}
+              isFuture={false}
               onEdit={(i) => { setEditItem(i); setShowModal(true); }}
               onDelete={setDeleteTarget}
               onArchive={handleArchive}
+              onFuture={handleFuture}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
             />
           ))}
+        </div>
+      )}
+
+      {/* Future Work section */}
+      {!isLoading && futureItems.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowFuture((v) => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors"
+          >
+            {showFuture ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <Clock size={13} />
+            Future Work ({futureItems.length})
+          </button>
+          {showFuture && (
+            <div className="space-y-3 mt-3">
+              {futureItems.map((item) => (
+                <PriorityCard
+                  key={item.id}
+                  item={item}
+                  idx={0}
+                  fmt={fmt}
+                  isArchived={false}
+                  isFuture={true}
+                  onEdit={() => {}}
+                  onDelete={setDeleteTarget}
+                  onArchive={handleArchive}
+                  onFuture={handleFuture}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -302,9 +361,11 @@ export default function PriorityPage() {
                   idx={0}
                   fmt={fmt}
                   isArchived={true}
+                  isFuture={false}
                   onEdit={() => {}}
                   onDelete={setDeleteTarget}
                   onArchive={handleArchive}
+                  onFuture={() => {}}
                   onDragStart={() => {}}
                   onDragOver={() => {}}
                   onDrop={() => {}}

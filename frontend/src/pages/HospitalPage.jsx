@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload, FilterX } from 'lucide-react';
 import Papa from 'papaparse';
 import {
   useHospitalExpenses,
@@ -402,7 +402,6 @@ export default function HospitalPage() {
         </div>
       </div>
 
-      {/* Summary cards */}
       {summary && (
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
@@ -458,6 +457,15 @@ export default function HospitalPage() {
             className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
           />
         </div>
+        {(month !== null || filterCategory !== '' || filterUser !== '' || search !== '') && (
+          <button
+            onClick={() => { setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setPage(1); }}
+            title="Clear all filters"
+            className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+          >
+            <FilterX size={16} />
+          </button>
+        )}
         <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
           <DollarSign size={11} className="inline" /> USD
         </span>

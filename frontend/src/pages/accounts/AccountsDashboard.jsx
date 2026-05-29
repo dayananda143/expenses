@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X, GripVertical, Car } from 'lucide-react';
@@ -98,15 +98,32 @@ function CarFinancePaymentModal({ onClose }) {
     if (!date)                         { setError('Select a date.');                  return; }
     if (amt > (cfg.remainingAmount ?? 0)) { setError('Amount exceeds remaining balance.'); return; }
 
+    let nextDueDate = cfg.dueDate;
+    if (cfg.dueDate) {
+      const day = parseInt(cfg.dueDate.split('-')[2]);
+      const paid = new Date(date + 'T00:00:00');
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const thisMonthDue = new Date(now.getFullYear(), now.getMonth(), day);
+      const baseDue = thisMonthDue >= today ? thisMonthDue : new Date(now.getFullYear(), now.getMonth() + 1, day);
+      const cycleStart = new Date(baseDue.getFullYear(), baseDue.getMonth() - 1, day);
+      const next = paid >= cycleStart
+        ? new Date(baseDue.getFullYear(), baseDue.getMonth() + 1, day)
+        : baseDue;
+      nextDueDate = next.toLocaleDateString('en-CA');
+    }
+
     const nextConfig = {
       ...cfg,
       remainingAmount: Math.max(0, (cfg.remainingAmount ?? 0) - amt),
       remainingMonths: Math.max(0, (cfg.remainingMonths ?? 0) - 1),
+      dueDate: nextDueDate,
     };
     const existing = JSON.parse(localStorage.getItem('car_finance_payments') || '[]');
     const nextPayments = [{ id: Date.now(), date, amount: amt }, ...existing];
     localStorage.setItem('car_finance_config', JSON.stringify(nextConfig));
     localStorage.setItem('car_finance_payments', JSON.stringify(nextPayments));
+    window.dispatchEvent(new CustomEvent('carFinanceUpdated'));
     onClose();
   }
 
@@ -375,6 +392,13 @@ export default function AccountsDashboard() {
   const { data: pmtData, isLoading: pmtLoading } = useAccountPayments();
   const [payingAccount, setPayingAccount] = useState(null);
   const [carPaymentOpen, setCarPaymentOpen] = useState(false);
+  const [carCfg, setCarCfg] = useState(() => { try { return JSON.parse(localStorage.getItem('car_finance_config') || '{}'); } catch { return {}; } });
+
+  useEffect(() => {
+    const handler = () => { try { setCarCfg(JSON.parse(localStorage.getItem('car_finance_config') || '{}')); } catch {} };
+    window.addEventListener('carFinanceUpdated', handler);
+    return () => window.removeEventListener('carFinanceUpdated', handler);
+  }, []);
 
   const accounts = acctData?.data ?? [];
   const payments = pmtData?.data ?? [];
@@ -397,18 +421,15 @@ export default function AccountsDashboard() {
       })
       .filter((a) => a.days !== null && a.days <= 30);
 
-    try {
-      const cf = JSON.parse(localStorage.getItem('car_finance_config') || '{}');
-      if (cf.dueDate) {
-        const days = daysFromToday(cf.dueDate);
-        if (days !== null && days <= 30) {
-          credits.push({ _type: 'car', id: '__car__', name: 'Car Finance', dueDate: cf.dueDate, days, remainingAmount: cf.remainingAmount ?? 0 });
-        }
+    if (carCfg.dueDate) {
+      const days = daysFromToday(carCfg.dueDate);
+      if (days !== null && days <= 30) {
+        credits.push({ _type: 'car', id: '__car__', name: 'Car Finance', dueDate: carCfg.dueDate, days, remainingAmount: carCfg.remainingAmount ?? 0 });
       }
-    } catch {}
+    }
 
     return credits.sort((a, b) => a.days - b.days);
-  }, [allCredits]);
+  }, [allCredits, carCfg]);
 
   const recentPayments = payments.slice(0, 5);
 

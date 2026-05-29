@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, Tag, Navigation, MapPin, FilterX } from 'lucide-react';
 
 const ICON_MAP = {
   'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
@@ -13,6 +13,7 @@ const ICON_MAP = {
 import Papa from 'papaparse';
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring } from '../hooks/useExpenses';
 import { useCategories, useAllSubtypes, useCreateCategory, useCreateSubtype } from '../hooks/useCategories';
+import { useTrips, useAssignExpenseToTrip } from '../hooks/useTrips';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -287,6 +288,92 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
   );
 }
 
+function AssignTripDialog({ expense, trips, onClose }) {
+  const { toast } = useToast();
+  const assignMutation = useAssignExpenseToTrip();
+  const [selected, setSelected] = useState(expense.trip_id ?? null);
+
+  async function handleAssign() {
+    try {
+      await assignMutation.mutateAsync({ expenseId: expense.id, tripId: selected });
+      toast(selected ? 'Expense assigned to trip' : 'Expense removed from trip');
+      onClose();
+    } catch (err) { toast(err?.error ?? 'Failed to assign expense', 'error'); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Assign to Trip</h2>
+            {(expense.description || expense.amount) && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate max-w-xs">{expense.description || `$${expense.amount}`}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={18} /></button>
+        </div>
+        <div className="p-2 max-h-72 overflow-y-auto space-y-0.5">
+          <button
+            onClick={() => setSelected(null)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-colors ${
+              selected === null
+                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected === null ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300 dark:border-gray-600'}`}>
+              {selected === null && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+            </span>
+            <span className="text-gray-500 dark:text-gray-400 italic">No trip</span>
+          </button>
+          {trips.map((trip) => (
+            <button
+              key={trip.id}
+              onClick={() => setSelected(trip.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left transition-colors ${
+                selected === trip.id
+                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${selected === trip.id ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                {selected === trip.id && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="truncate font-medium">{trip.name}</p>
+                {trip.destination && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1">
+                    <MapPin size={10} /> {trip.destination}
+                  </p>
+                )}
+              </div>
+              {trip.start_date && (
+                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{trip.start_date}</span>
+              )}
+            </button>
+          ))}
+          {trips.length === 0 && (
+            <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">No trips yet. Create one on the Trips page.</p>
+          )}
+        </div>
+        <div className="flex gap-3 px-5 py-4 border-t border-gray-100 dark:border-gray-700">
+          <button onClick={onClose} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleAssign}
+            disabled={assignMutation.isPending || selected === (expense.trip_id ?? null)}
+            className="flex-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {assignMutation.isPending ? 'Saving...' : 'Assign'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ExpensesPage() {
   const { toast } = useToast();
   const { workspace, fmt } = useWorkspace();
@@ -308,6 +395,7 @@ export default function ExpensesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editExpense, setEditExpense] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [assignTarget, setAssignTarget] = useState(null);
   const [filterMode, setFilterMode] = useState('month'); // 'month' | 'range'
   const [filterMonth, setFilterMonth] = useState(initialMonth);
   const [filterYear, setFilterYear] = useState(initialYear);
@@ -320,6 +408,9 @@ export default function ExpensesPage() {
   const [limit, setLimit] = useState(10);
   const fileRef = useRef(null);
   const applyRecurring = useApplyRecurring();
+
+  const { data: tripsData } = useTrips();
+  const trips = tripsData?.data ?? [];
 
   const { data: catData } = useCategories();
   const { data: subtypesData } = useAllSubtypes();
@@ -363,6 +454,20 @@ export default function ExpensesPage() {
 
   function handleMonthChange(m, y) { setFilterMonth(m); setFilterYear(y); setPage(1); }
   function clearMonthFilter() { setFilterMonth(null); setPage(1); }
+
+  const hasActiveFilters = filters.search !== '' || filters.category_id !== '' ||
+    (filterMode === 'range' && (dateFrom || dateTo)) ||
+    (filterMode === 'month' && filterMonth !== null && (filterMonth !== now.getMonth() + 1 || filterYear !== now.getFullYear()));
+
+  function clearAllFilters() {
+    setFilters({ category_id: '', search: '' });
+    setFilterMode('month');
+    setFilterMonth(now.getMonth() + 1);
+    setFilterYear(now.getFullYear());
+    setDateFrom('');
+    setDateTo('');
+    setPage(1);
+  }
 
   async function handleApplyRecurring() {
     const m = filterMode === 'month' && filterMonth ? filterMonth : now.getMonth() + 1;
@@ -447,7 +552,8 @@ export default function ExpensesPage() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="flex items-start gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 flex-1">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -484,6 +590,16 @@ export default function ExpensesPage() {
                 </div>
             }
           </div>
+        </div>
+        {hasActiveFilters && (
+          <button
+            onClick={clearAllFilters}
+            title="Clear all filters"
+            className="shrink-0 p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <FilterX size={16} />
+          </button>
+        )}
         </div>
         {/* Recurring apply banner — admin only */}
         {isAdmin && <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
@@ -572,6 +688,11 @@ export default function ExpensesPage() {
                                 <RefreshCw size={10} /> recurring
                               </span>
                             )}
+                            {e.trip_id && (() => { const t = trips.find((tr) => tr.id === e.trip_id); return t ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400" title={`Trip: ${t.name}`}>
+                                <Plane size={10} /> {t.name}
+                              </span>
+                            ) : null; })()}
                           </div>
                           {e.notes && <p className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs mt-0.5">{e.notes}</p>}
                         </td>
@@ -579,6 +700,9 @@ export default function ExpensesPage() {
                         {isAdmin && (
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-1">
+                              <button onClick={() => setAssignTarget(e)} title="Assign to trip" className="p-1.5 text-gray-400 hover:text-violet-600 rounded-md hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors">
+                                <Navigation size={14} />
+                              </button>
                               <button onClick={() => openCopy(e)} title="Duplicate" className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                                 <Copy size={14} />
                               </button>
@@ -658,6 +782,13 @@ export default function ExpensesPage() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           loading={deleteExp.isPending}
+        />
+      )}
+      {assignTarget && (
+        <AssignTripDialog
+          expense={assignTarget}
+          trips={trips}
+          onClose={() => setAssignTarget(null)}
         />
       )}
     </div>

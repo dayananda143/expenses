@@ -71,6 +71,16 @@ router.patch('/:id/archive', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PATCH /api/priority/:id/future
+router.patch('/:id/future', (req, res, next) => {
+  try {
+    const item = db.prepare(`SELECT * FROM priority_items WHERE id = ? AND ${adminUserWhere} AND workspace = ?`).get(req.params.id, req.workspace);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    db.prepare('UPDATE priority_items SET is_future = ? WHERE id = ?').run(item.is_future ? 0 : 1, item.id);
+    res.json({ data: db.prepare('SELECT * FROM priority_items WHERE id = ?').get(item.id) });
+  } catch (err) { next(err); }
+});
+
 // PATCH /api/priority/reorder
 router.patch('/reorder', (req, res, next) => {
   try {

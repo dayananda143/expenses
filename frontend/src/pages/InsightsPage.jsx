@@ -99,7 +99,7 @@ export default function InsightsPage() {
         // Best / worst months
         const monthlyWithNames = (monthly ?? []).map((m) => ({
           ...m,
-          label: new Date(m.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+          label: (() => { const [y, mo] = m.month.split('-'); return new Date(parseInt(y), parseInt(mo) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); })(),
         })).filter((m) => m.total > 0);
         const bestMonth  = monthlyWithNames.length ? [...monthlyWithNames].sort((a, b) => a.total - b.total)[0]  : null;
         const worstMonth = monthlyWithNames.length ? [...monthlyWithNames].sort((a, b) => b.total - a.total)[0]  : null;

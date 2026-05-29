@@ -21,6 +21,7 @@ import CategoriesPage from './pages/CategoriesPage';
 import BudgetsPage from './pages/BudgetsPage';
 import UsersPage from './pages/UsersPage';
 import HospitalPage from './pages/HospitalPage';
+import HospitalDashboardPage from './pages/HospitalDashboardPage';
 import HospitalCategoriesPage from './pages/HospitalCategoriesPage';
 import SalaryPage from './pages/SalaryPage';
 import IndiaListPage from './pages/IndiaListPage';
@@ -37,6 +38,7 @@ import PoultryInsightsPage from './pages/PoultryInsightsPage';
 import PoultryStakePage from './pages/PoultryStakePage';
 import LoanPage from './pages/LoanPage';
 import UmaSbiPage from './pages/UmaSbiPage';
+import TripsPage from './pages/TripsPage';
 import { useWorkspace } from './contexts/WorkspaceContext';
 import { useAuth } from './contexts/AuthContext';
 
@@ -55,13 +57,18 @@ function DashboardRoute() {
   const { workspace } = useWorkspace();
   if (workspace === 'health') return <Navigate to="/health" replace />;
   if (workspace === 'poultry') return <Navigate to="/poultry" replace />;
-  if (workspace === 'hospital') return <Navigate to="/hospital" replace />;
+  if (workspace === 'hospital') return <Navigate to="/hospital-dashboard" replace />;
   return <DashboardPage />;
 }
 
 function HospitalRoute() {
   const { user } = useAuth();
   return (user?.is_admin || user?.hospital_access) ? <HospitalPage /> : <Navigate to="/dashboard" replace />;
+}
+
+function HospitalDashboardRoute() {
+  const { user } = useAuth();
+  return (user?.is_admin || user?.hospital_access) ? <HospitalDashboardPage /> : <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
@@ -92,7 +99,8 @@ export default function App() {
             <Route path="loans"      element={<LoanPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="budgets"    element={<BudgetsPage />} />
-            <Route path="hospital"   element={<HospitalRoute />} />
+            <Route path="hospital"            element={<HospitalRoute />} />
+            <Route path="hospital-dashboard"  element={<HospitalDashboardRoute />} />
             <Route path="salary"     element={<SalaryPage />} />
             <Route path="india-list" element={<IndiaListPage />} />
             <Route path="health" element={<HealthPage />} />
@@ -107,6 +115,7 @@ export default function App() {
             <Route path="poultry/insights" element={<PoultryInsightsPage />} />
             <Route path="poultry/stake" element={<PoultryStakePage />} />
             <Route path="poultry/uma-sbi" element={<UmaSbiPage />} />
+            <Route path="trips"         element={<TripsPage />} />
             <Route element={<AdminRoute />}>
               <Route path="users" element={<UsersPage />} />
               <Route path="hospital-categories" element={<HospitalCategoriesPage />} />
