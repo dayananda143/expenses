@@ -440,7 +440,10 @@ export default function ExpensesPage() {
   const expenses = data?.data ?? [];
   const pagination = data?.pagination;
 
-  function openAdd() { setEditExpense(null); setShowModal(true); }
+  function openAdd() {
+    setEditExpense(filters.category_id ? { category_id: filters.category_id, date: new Date().toLocaleDateString('en-CA'), subtype: '', notes: '', is_recurring: false } : null);
+    setShowModal(true);
+  }
   function openEdit(e) { setEditExpense(e); setShowModal(true); }
   function openCopy(e) { setEditExpense({ ...e, id: null }); setShowModal(true); }
 
@@ -778,7 +781,7 @@ export default function ExpensesPage() {
       )}
       {deleteTarget && (
         <ConfirmDialog
-          message={`Delete "${deleteTarget.description}" (${fmt(deleteTarget.amount)})?`}
+          message={`Delete "${deleteTarget.description || deleteTarget.subtype || deleteTarget.category_name || 'expense'}" (${fmt(deleteTarget.amount)})?`}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
           loading={deleteExp.isPending}

@@ -23,6 +23,9 @@ const healthRouter          = require('./routes/health');
 const poultryRouter         = require('./routes/poultry');
 const loansRouter           = require('./routes/loans');
 const umaSbiRouter          = require('./routes/umaSbi');
+const tripsRouter           = require('./routes/trips');
+const brainstormRouter      = require('./routes/brainstorm');
+const propertiesRouter      = require('./routes/properties');
 const errorHandler     = require('./middleware/errorHandler');
 const requireAuth      = require('./middleware/auth');
 
@@ -64,6 +67,9 @@ app.use('/api/health',           healthRouter);
 app.use('/api/poultry',          poultryRouter);
 app.use('/api/loans',            loansRouter);
 app.use('/api/uma-sbi',          umaSbiRouter);
+app.use('/api/trips',            tripsRouter);
+app.use('/api/brainstorm',       brainstormRouter);
+app.use('/api/properties',      propertiesRouter);
 app.use(errorHandler);
 
 db.ready.then(() => {

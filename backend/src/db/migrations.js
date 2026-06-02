@@ -679,6 +679,52 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_uma_sbi_user ON uma_sbi(user_id);
   `);
 
+  // Properties (India workspace)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS properties (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace         TEXT NOT NULL DEFAULT 'india',
+      name              TEXT NOT NULL,
+      area              TEXT DEFAULT NULL,
+      actual_price      REAL DEFAULT NULL,
+      appreciated_value REAL DEFAULT NULL,
+      year_purchased    INTEGER DEFAULT NULL,
+      notes             TEXT DEFAULT NULL,
+      sort_order        INTEGER NOT NULL DEFAULT 0,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_properties_user ON properties(user_id);
+  `);
+  try { db.exec("ALTER TABLE properties ADD COLUMN purchase_date TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE properties ADD COLUMN sold_date TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE properties ADD COLUMN sold_amount REAL DEFAULT NULL"); } catch {}
+
+  // Brainstorm items (India workspace)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS brainstorm_items (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace    TEXT NOT NULL DEFAULT 'india',
+      name         TEXT NOT NULL,
+      total_amount REAL NOT NULL DEFAULT 0,
+      paid_amount  REAL NOT NULL DEFAULT 0,
+      notes        TEXT DEFAULT NULL,
+      sort_order   INTEGER NOT NULL DEFAULT 0,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_brainstorm_items_user ON brainstorm_items(user_id);
+
+    CREATE TABLE IF NOT EXISTS brainstorm_records (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id    INTEGER NOT NULL REFERENCES brainstorm_items(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      amount     REAL NOT NULL CHECK (amount > 0),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_brainstorm_records_item ON brainstorm_records(item_id);
+  `);
+
   // Trips
   db.exec(`
     CREATE TABLE IF NOT EXISTS trips (

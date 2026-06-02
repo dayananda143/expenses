@@ -97,16 +97,19 @@ function TripExpenses({ tripId }) {
   );
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
+    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-0.5 max-h-72 overflow-y-auto">
       {expenses.map((e) => (
         <div key={e.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{e.date}</span>
-            <span className="text-sm text-gray-800 dark:text-gray-200 truncate">{e.description || '—'}</span>
-            {e.category_name && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full shrink-0" style={{ background: e.category_color + '22', color: e.category_color }}>
-                {e.category_name}
-              </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{e.date}</span>
+            </div>
+            {e.subtype && (
+              <div className="mt-0.5">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                  {e.subtype}
+                </span>
+              </div>
             )}
           </div>
           <span className="text-sm font-semibold text-gray-900 dark:text-white ml-3 shrink-0">{fmt(e.amount)}</span>

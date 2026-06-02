@@ -14,6 +14,7 @@ client.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('expenses_token');
       if (window.location.pathname !== '/login') {
+        sessionStorage.setItem('expenses_redirect', window.location.pathname + window.location.search);
         window.location.href = '/login';
       }
     }

@@ -143,6 +143,12 @@ function EnrollFaceId({ pendingToken, onDone }) {
   );
 }
 
+function getRedirectPath() {
+  const stored = sessionStorage.getItem('expenses_redirect');
+  sessionStorage.removeItem('expenses_redirect');
+  return stored && stored !== '/login' ? stored : '/dashboard';
+}
+
 export default function LoginPage() {
   const { login, loginWith2fa } = useAuth();
   const navigate = useNavigate();
@@ -187,7 +193,7 @@ export default function LoginPage() {
         setPendingToken(tok);
         setStep('enroll');
       } else {
-        navigate('/dashboard', { replace: true });
+        navigate(getRedirectPath(), { replace: true });
       }
     } catch (err) {
       if (err?.require_2fa) {
@@ -208,7 +214,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await loginWith2fa(tempToken, tfaCode);
-      navigate('/dashboard', { replace: true });
+      navigate(getRedirectPath(), { replace: true });
     } catch (err) {
       setError(err?.error ?? 'Invalid code');
     } finally {

@@ -5,28 +5,34 @@ const requireWorkspace = require('../middleware/workspace');
 
 router.use(requireWorkspace);
 
-// GET /api/categories?workspace=india
+function getAdminId() {
+  return db.prepare('SELECT id FROM users WHERE is_admin = 1 ORDER BY id ASC LIMIT 1').get()?.id;
+}
+
+// GET /api/categories?workspace=india — shared: always return admin's categories
 router.get('/', (req, res, next) => {
   try {
+    const adminId = getAdminId();
     const rows = db.prepare(
       'SELECT * FROM categories WHERE user_id = ? AND workspace = ? ORDER BY sort_order ASC, name ASC'
-    ).all(req.user.id, req.workspace);
+    ).all(adminId, req.workspace);
     res.json({ data: rows });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/categories?workspace=india
+// POST /api/categories?workspace=india — always creates under admin user
 router.post('/', (req, res, next) => {
   try {
     const { name, color, icon } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
 
-    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories WHERE user_id = ? AND workspace = ?').get(req.user.id, req.workspace).m;
+    const adminId = getAdminId();
+    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM categories WHERE user_id = ? AND workspace = ?').get(adminId, req.workspace).m;
     const result = db.prepare(
       'INSERT INTO categories (user_id, name, color, icon, workspace, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(req.user.id, name.trim(), color ?? '#6366f1', icon ?? 'circle', req.workspace, maxOrder + 1);
+    ).run(adminId, name.trim(), color ?? '#6366f1', icon ?? 'circle', req.workspace, maxOrder + 1);
 
     const row = db.prepare('SELECT * FROM categories WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: row });
@@ -40,8 +46,9 @@ router.patch('/reorder', (req, res, next) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+    const adminId = getAdminId();
     const update = db.prepare('UPDATE categories SET sort_order = ? WHERE id = ? AND user_id = ? AND workspace = ?');
-    ids.forEach((id, idx) => update.run(idx, id, req.user.id, req.workspace));
+    ids.forEach((id, idx) => update.run(idx, id, adminId, req.workspace));
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -51,9 +58,10 @@ router.patch('/reorder', (req, res, next) => {
 // PUT /api/categories/:id?workspace=india
 router.put('/:id', (req, res, next) => {
   try {
+    const adminId = getAdminId();
     const cat = db.prepare(
       'SELECT * FROM categories WHERE id = ? AND user_id = ? AND workspace = ?'
-    ).get(req.params.id, req.user.id, req.workspace);
+    ).get(req.params.id, adminId, req.workspace);
     if (!cat) return res.status(404).json({ error: 'Category not found' });
 
     const { name, color, icon } = req.body;
@@ -73,9 +81,10 @@ router.put('/:id', (req, res, next) => {
 // DELETE /api/categories/:id?workspace=india
 router.delete('/:id', (req, res, next) => {
   try {
+    const adminId = getAdminId();
     const cat = db.prepare(
       'SELECT * FROM categories WHERE id = ? AND user_id = ? AND workspace = ?'
-    ).get(req.params.id, req.user.id, req.workspace);
+    ).get(req.params.id, adminId, req.workspace);
     if (!cat) return res.status(404).json({ error: 'Category not found' });
 
     db.prepare('DELETE FROM categories WHERE id = ?').run(cat.id);
@@ -88,9 +97,10 @@ router.delete('/:id', (req, res, next) => {
 // GET /api/categories/:id/subtypes
 router.get('/:id/subtypes', (req, res, next) => {
   try {
+    const adminId = getAdminId();
     const rows = db.prepare(
       'SELECT * FROM category_subtypes WHERE category_id = ? AND user_id = ? ORDER BY sort_order ASC, name ASC'
-    ).all(req.params.id, req.user.id);
+    ).all(req.params.id, adminId);
     res.json({ data: rows });
   } catch (err) { next(err); }
 });
@@ -98,12 +108,13 @@ router.get('/:id/subtypes', (req, res, next) => {
 // POST /api/categories/:id/subtypes
 router.post('/:id/subtypes', (req, res, next) => {
   try {
+    const adminId = getAdminId();
     const { name } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
-    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM category_subtypes WHERE category_id = ? AND user_id = ?').get(req.params.id, req.user.id).m;
+    const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM category_subtypes WHERE category_id = ? AND user_id = ?').get(req.params.id, adminId).m;
     const result = db.prepare(
       'INSERT INTO category_subtypes (category_id, user_id, name, sort_order) VALUES (?, ?, ?, ?)'
-    ).run(req.params.id, req.user.id, name.trim(), maxOrder + 1);
+    ).run(req.params.id, adminId, name.trim(), maxOrder + 1);
     res.status(201).json({ data: db.prepare('SELECT * FROM category_subtypes WHERE id = ?').get(result.lastInsertRowid) });
   } catch (err) { next(err); }
 });
@@ -111,7 +122,8 @@ router.post('/:id/subtypes', (req, res, next) => {
 // DELETE /api/categories/:id/subtypes/:sid
 router.delete('/:id/subtypes/:sid', (req, res, next) => {
   try {
-    db.prepare('DELETE FROM category_subtypes WHERE id = ? AND user_id = ?').run(req.params.sid, req.user.id);
+    const adminId = getAdminId();
+    db.prepare('DELETE FROM category_subtypes WHERE id = ? AND user_id = ?').run(req.params.sid, adminId);
     res.status(204).send();
   } catch (err) { next(err); }
 });
@@ -119,12 +131,13 @@ router.delete('/:id/subtypes/:sid', (req, res, next) => {
 // GET /api/categories/subtypes/all  — all subtypes for a workspace (for expense form)
 router.get('/subtypes/all', (req, res, next) => {
   try {
+    const adminId = getAdminId();
     const rows = db.prepare(
       `SELECT cs.* FROM category_subtypes cs
        JOIN categories c ON c.id = cs.category_id
        WHERE cs.user_id = ? AND c.workspace = ?
        ORDER BY cs.category_id, cs.sort_order ASC, cs.name ASC`
-    ).all(req.user.id, req.workspace);
+    ).all(adminId, req.workspace);
     res.json({ data: rows });
   } catch (err) { next(err); }
 });

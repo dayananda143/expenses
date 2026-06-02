@@ -266,6 +266,18 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
+// PATCH /api/expenses/:id/trip — assign or unassign from a trip
+router.patch('/:id/trip', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const existing = db.prepare('SELECT * FROM expenses WHERE id = ? AND workspace = ?').get(req.params.id, req.workspace);
+    if (!existing) return res.status(404).json({ error: 'Expense not found' });
+    const { trip_id } = req.body;
+    db.prepare('UPDATE expenses SET trip_id = ? WHERE id = ?').run(trip_id ?? null, existing.id);
+    res.json({ data: db.prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id) });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/expenses/:id?workspace=india
 router.delete('/:id', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });

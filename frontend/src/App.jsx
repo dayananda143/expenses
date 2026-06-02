@@ -39,6 +39,9 @@ import PoultryStakePage from './pages/PoultryStakePage';
 import LoanPage from './pages/LoanPage';
 import UmaSbiPage from './pages/UmaSbiPage';
 import TripsPage from './pages/TripsPage';
+import BrainstormPage from './pages/BrainstormPage';
+import BrainstormDetailPage from './pages/BrainstormDetailPage';
+import PropertyPage from './pages/PropertyPage';
 import { useWorkspace } from './contexts/WorkspaceContext';
 import { useAuth } from './contexts/AuthContext';
 
@@ -116,6 +119,9 @@ export default function App() {
             <Route path="poultry/stake" element={<PoultryStakePage />} />
             <Route path="poultry/uma-sbi" element={<UmaSbiPage />} />
             <Route path="trips"         element={<TripsPage />} />
+            <Route path="brainstorm"    element={<BrainstormPage />} />
+            <Route path="brainstorm/:id" element={<BrainstormDetailPage />} />
+            <Route path="property"      element={<PropertyPage />} />
             <Route element={<AdminRoute />}>
               <Route path="users" element={<UsersPage />} />
               <Route path="hospital-categories" element={<HospitalCategoriesPage />} />
