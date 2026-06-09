@@ -31,3 +31,18 @@ export function useDeleteUmaSbi() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['uma-sbi'] }),
   });
 }
+
+export function useUmaSbiSettings() {
+  return useQuery({
+    queryKey: ['uma-sbi-settings'],
+    queryFn: () => client.get('/uma-sbi/settings'),
+  });
+}
+
+export function useUpdateUmaSbiSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => client.put('/uma-sbi/settings', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['uma-sbi-settings'] }),
+  });
+}

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
-  Plus, Pencil, Trash2, X, Banknote, AlertCircle, Landmark,
+  Plus, Pencil, Trash2, X, Banknote, AlertCircle, Landmark, CalendarDays, Check,
 } from 'lucide-react';
-import { useUmaSbi, useCreateUmaSbi, useUpdateUmaSbi, useDeleteUmaSbi } from '../hooks/useUmaSbi';
+import { useUmaSbi, useCreateUmaSbi, useUpdateUmaSbi, useDeleteUmaSbi, useUmaSbiSettings, useUpdateUmaSbiSettings } from '../hooks/useUmaSbi';
 import { useAuth } from '../contexts/AuthContext';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -134,14 +134,25 @@ export default function UmaSbiPage() {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
 
-  const { data, isLoading } = useUmaSbi();
-  const deleteEntry = useDeleteUmaSbi();
+  const { data, isLoading }             = useUmaSbi();
+  const { data: settingsData }          = useUmaSbiSettings();
+  const updateSettings                  = useUpdateUmaSbiSettings();
+  const deleteEntry                     = useDeleteUmaSbi();
 
   const [modal, setModal]               = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [saved, setSaved]               = useState(false);
 
-  const entries = data?.data ?? [];
-  const total   = entries.reduce((s, e) => s + (e.amount ?? 0), 0);
+  const asOfDate  = settingsData?.as_of_date ?? null;
+  const allEntries = data?.data ?? [];
+  const entries    = asOfDate ? allEntries.filter((e) => !e.date || e.date <= asOfDate) : allEntries;
+  const total      = entries.reduce((s, e) => s + (e.amount ?? 0), 0);
+
+  async function handleAsOfDateChange(date) {
+    await updateSettings.mutateAsync({ as_of_date: date || null });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
 
   if (isLoading) {
     return (
@@ -165,6 +176,31 @@ export default function UmaSbiPage() {
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm shrink-0"
           >
             <Plus size={15} /> Add Entry
+          </button>
+        )}
+      </div>
+
+      {/* As-of date picker */}
+      <div className="flex items-center gap-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 w-fit">
+        <CalendarDays size={15} className="text-gray-400 shrink-0" />
+        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Tallied up to</span>
+        <input
+          type="date"
+          value={asOfDate ?? ''}
+          onChange={(e) => handleAsOfDateChange(e.target.value)}
+          className="text-sm font-semibold text-gray-900 dark:text-white bg-transparent focus:outline-none cursor-pointer"
+        />
+        {saved && (
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <Check size={11} />Saved
+          </span>
+        )}
+        {!saved && asOfDate && (
+          <button
+            onClick={() => handleAsOfDateChange(null)}
+            className="text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-colors whitespace-nowrap"
+          >
+            Clear
           </button>
         )}
       </div>

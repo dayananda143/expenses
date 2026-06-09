@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, ChevronDown, ChevronUp, Archive } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Archive, Droplets } from 'lucide-react';
 import { useAccounts, useDeleteAccount, useReorderAccounts, useArchiveAccount } from '../../hooks/useAccounts';
 import { WS, fmtUSD, AccountCard, AccountModal, AccountDetailModal, DeleteConfirm, ArchiveConfirm } from './shared';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +20,7 @@ export default function SavingsPage() {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
   const [userTab, setUserTab] = useState('all');
+  const [liquidFilter, setLiquidFilter] = useState('all');
 
   const dragId = useRef(null);
 
@@ -37,17 +38,18 @@ export default function SavingsPage() {
     userTab === '__none__'   ? allSavings.filter((a) => !a.belongs_to_username) :
                                allSavings.filter((a) => a.belongs_to_username === userTab);
 
-  const serverVisible = showInactive ? userFiltered : userFiltered.filter((a) => a.is_active !== 0);
+  const liquidFiltered =
+    liquidFilter === 'liquid'     ? userFiltered.filter((a) => a.is_liquid) :
+    liquidFilter === 'non-liquid' ? userFiltered.filter((a) => !a.is_liquid) :
+                                    userFiltered;
+
+  const serverVisible = showInactive ? liquidFiltered : liquidFiltered.filter((a) => a.is_active !== 0);
   const visible = localOrder
     ? localOrder.map((id) => serverVisible.find((a) => a.id === id)).filter(Boolean)
     : serverVisible;
-  const hiddenCount = userFiltered.length - userFiltered.filter((a) => a.is_active !== 0).length;
+  const hiddenCount = liquidFiltered.length - liquidFiltered.filter((a) => a.is_active !== 0).length;
 
-  const totalBalance = activeFilter.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const tabBalance =
-    userTab === 'all'      ? totalBalance :
-    userTab === '__none__' ? activeFilter.filter((a) => !a.belongs_to_username).reduce((s, a) => s + (a.balance ?? 0), 0) :
-                             activeFilter.filter((a) => a.belongs_to_username === userTab).reduce((s, a) => s + (a.balance ?? 0), 0);
+  const tabBalance = liquidFiltered.filter((a) => a.is_active !== 0).reduce((s, a) => s + (a.balance ?? 0), 0);
 
   function handleDragStart(id) {
     dragId.current = id;
@@ -107,22 +109,43 @@ export default function SavingsPage() {
         )}
       </div>
 
-      {/* User tabs */}
-      {showTabs && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          <button className={tabCls(userTab === 'all')} onClick={() => setUserTab('all')}>All</button>
-          {userNames.map((name) => (
-            <button key={name} className={tabCls(userTab === name)} onClick={() => setUserTab(name)}>
-              {name}
+      {/* Filters row: user tabs (left) + liquidity segmented control (right) */}
+      <div className="flex items-center gap-3">
+        {showTabs && (
+          <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 pb-0.5">
+            <button className={tabCls(userTab === 'all')} onClick={() => setUserTab('all')}>All</button>
+            {userNames.map((name) => (
+              <button key={name} className={tabCls(userTab === name)} onClick={() => setUserTab(name)}>
+                {name}
+              </button>
+            ))}
+            {hasUnassigned && (
+              <button className={tabCls(userTab === '__none__')} onClick={() => setUserTab('__none__')}>
+                Unassigned
+              </button>
+            )}
+          </div>
+        )}
+        <div className="flex shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {[
+            { value: 'all',        label: 'All' },
+            { value: 'liquid',     label: 'Liquid', icon: <Droplets size={10} /> },
+            { value: 'non-liquid', label: 'Non-liquid' },
+          ].map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => setLiquidFilter(value)}
+              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border-r border-gray-200 dark:border-gray-700 last:border-r-0 transition-colors ${
+                liquidFilter === value
+                  ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900'
+                  : 'bg-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              {icon}{label}
             </button>
           ))}
-          {hasUnassigned && (
-            <button className={tabCls(userTab === '__none__')} onClick={() => setUserTab('__none__')}>
-              Unassigned
-            </button>
-          )}
         </div>
-      )}
+      </div>
 
       {isLoading && (
         <div className="flex justify-center py-12">

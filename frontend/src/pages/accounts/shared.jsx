@@ -1,8 +1,8 @@
 // Shared helpers, badges, modal, and card used across accounts pages
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX } from 'lucide-react';
+import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -185,21 +185,28 @@ const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 m
 export function AccountModal({ account, defaultType, onClose }) {
   const create = useCreateAccount(WS);
   const update = useUpdateAccount(WS);
-  const { data: usersData } = useSavingsUsers();
+  const { data: usersData, isSuccess: usersReady } = useSavingsUsers();
   const allUsers = usersData?.data ?? [];
   const isEdit = !!account;
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: account ? {
       name: account.name, type: account.type, balance: account.balance,
       credit_limit: account.credit_limit ?? '', due_day: account.due_day ?? '',
       promo_apr_end_date: account.promo_apr_end_date ?? '',
       is_active: account.is_active !== 0, notes: account.notes ?? '',
-      belongs_to_user_id: account.belongs_to_user_id ?? '',
-    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '' },
+      belongs_to_user_id: account.belongs_to_user_id != null ? String(account.belongs_to_user_id) : '',
+      is_liquid: account.is_liquid !== 0,
+    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false },
   });
   const type = watch('type');
   const name = watch('name');
+
+  useEffect(() => {
+    if (usersReady && account?.belongs_to_user_id != null) {
+      setValue('belongs_to_user_id', String(account.belongs_to_user_id));
+    }
+  }, [usersReady]);
 
   async function onSubmit(data) {
     const payload = {
@@ -210,6 +217,7 @@ export function AccountModal({ account, defaultType, onClose }) {
       promo_apr_end_date: data.type === 'credit' && data.promo_apr_end_date ? data.promo_apr_end_date : null,
       is_active: data.is_active,
       belongs_to_user_id: data.belongs_to_user_id ? parseInt(data.belongs_to_user_id) : null,
+      is_liquid: data.is_liquid,
     };
     if (isEdit) await update.mutateAsync({ id: account.id, ...payload });
     else await create.mutateAsync(payload);
@@ -296,6 +304,15 @@ export function AccountModal({ account, defaultType, onClose }) {
               <p className="text-xs text-gray-400">Inactive accounts are hidden by default</p>
             </div>
           </label>
+          {type === 'savings' && (
+            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              <input type="checkbox" {...register('is_liquid')} className="w-4 h-4 accent-cyan-600 rounded" />
+              <div>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5"><Droplets size={13} className="text-cyan-500" />Liquid</span>
+                <p className="text-xs text-gray-400">Funds can be accessed quickly (cash, checking, HYSA)</p>
+              </div>
+            </label>
+          )}
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
@@ -459,6 +476,7 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
                 <DetailRow label="Notes" value={a.notes} />
               )}
               <DetailRow label="Status" value={a.is_active ? 'Active' : 'Inactive'} valueClass={a.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'} />
+              <DetailRow label="Liquidity" value={a.is_liquid ? 'Liquid' : 'Non-liquid'} valueClass={a.is_liquid ? 'text-cyan-600 dark:text-cyan-400' : 'text-gray-400'} />
             </div>
           )}
 
@@ -604,12 +622,23 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
                   {!a.is_active && <EyeOff size={11} className="text-gray-400 shrink-0" />}
                   {onView && <Info size={10} className="text-gray-300 dark:text-gray-700 shrink-0" />}
                 </div>
-                {a.belongs_to_username && (
-                  <span className="inline-block mt-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                    {a.belongs_to_username}
-                  </span>
-                )}
-                {a.notes && <p className="text-xs text-gray-400 truncate">{a.notes}</p>}
+                <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                  {a.belongs_to_username && (
+                    <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                      {a.belongs_to_username}
+                    </span>
+                  )}
+                  {a.is_liquid ? (
+                    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400">
+                      <Droplets size={9} />Liquid
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      Non-liquid
+                    </span>
+                  )}
+                </div>
+                {a.notes && <p className="text-xs text-gray-400 truncate mt-0.5">{a.notes}</p>}
               </div>
             </button>
             <div className="flex items-center gap-2 shrink-0">

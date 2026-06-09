@@ -35,6 +35,27 @@ router.post('/', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/uma-sbi/settings
+router.get('/settings', (req, res, next) => {
+  try {
+    const adminId = req.user.is_admin
+      ? req.user.id
+      : db.prepare('SELECT id FROM users WHERE is_admin = 1 LIMIT 1').get()?.id;
+    const row = db.prepare('SELECT uma_sbi_as_of_date FROM users WHERE id = ?').get(adminId);
+    res.json({ as_of_date: row?.uma_sbi_as_of_date ?? null });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/uma-sbi/settings
+router.put('/settings', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { as_of_date } = req.body;
+    db.prepare('UPDATE users SET uma_sbi_as_of_date = ? WHERE id = ?').run(as_of_date ?? null, req.user.id);
+    res.json({ as_of_date: as_of_date ?? null });
+  } catch (err) { next(err); }
+});
+
 // PUT /api/uma-sbi/:id
 router.put('/:id', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });

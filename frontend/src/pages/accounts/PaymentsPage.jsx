@@ -11,6 +11,13 @@ import { useAuth } from '../../contexts/AuthContext';
 const inputCls = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors';
 const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide';
 
+function toYM(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+const _now = new Date();
+const DEFAULT_END_MONTH = toYM(_now);
+const DEFAULT_START_MONTH = toYM(new Date(_now.getFullYear(), _now.getMonth() - 1, 1));
+
 function buildPages(cur, total) {
   const delta = 1;
   const pages = [];
@@ -43,9 +50,18 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
+  const [filterStartMonth, setFilterStartMonth] = useState(DEFAULT_START_MONTH);
+  const [filterEndMonth, setFilterEndMonth] = useState(DEFAULT_END_MONTH);
+
   const creditAccounts = (acctData?.data ?? []).filter((a) => a.type === 'credit' && a.is_active !== 0);
   const payments = pmtData?.data ?? [];
-  const filteredPayments = filterAccountId ? payments.filter((p) => p.account_id === parseInt(filterAccountId)) : payments;
+  const filteredPayments = payments.filter((p) => {
+    if (filterAccountId && p.account_id !== parseInt(filterAccountId)) return false;
+    const pMonth = p.date.slice(0, 7);
+    if (filterStartMonth && pMonth < filterStartMonth) return false;
+    if (filterEndMonth && pMonth > filterEndMonth) return false;
+    return true;
+  });
   const filteredTotal = filteredPayments.reduce((s, p) => s + p.amount, 0);
 
   const totalPages = Math.ceil(filteredPayments.length / pageSize);
@@ -87,6 +103,16 @@ export default function PaymentsPage() {
 
   function handlePageSizeChange(n) {
     setPageSize(n);
+    setPage(1);
+  }
+
+  function handleStartMonthChange(val) {
+    setFilterStartMonth(val);
+    setPage(1);
+  }
+
+  function handleEndMonthChange(val) {
+    setFilterEndMonth(val);
     setPage(1);
   }
 
@@ -153,6 +179,22 @@ export default function PaymentsPage() {
             )}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Month range pickers */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="month"
+                value={filterStartMonth}
+                onChange={(e) => handleStartMonthChange(e.target.value)}
+                className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-400">–</span>
+              <input
+                type="month"
+                value={filterEndMonth}
+                onChange={(e) => handleEndMonthChange(e.target.value)}
+                className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
             {payments.length > 0 && (
               <>
                 <div className="flex items-center gap-1.5">
@@ -195,7 +237,7 @@ export default function PaymentsPage() {
         )}
 
         {!isLoading && payments.length > 0 && filteredPayments.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-8">No payments for this card.</p>
+          <p className="text-sm text-gray-400 text-center py-8">No payments match the selected filters.</p>
         )}
 
         {!isLoading && filteredPayments.length > 0 && (
@@ -259,7 +301,7 @@ export default function PaymentsPage() {
             )}
 
             <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <span>{filterAccountId ? 'Filtered total' : 'Total paid'}</span>
+              <span>{(filterAccountId || filterStartMonth || filterEndMonth) ? 'Filtered total' : 'Total paid'}</span>
               <span>{fmtUSDDecimal(filteredTotal)}</span>
             </div>
           </>

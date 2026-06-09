@@ -46,10 +46,7 @@ export default function CreditCardsPage() {
     : serverVisible;
   const hiddenCount = userFiltered.length - userFiltered.filter((a) => a.is_active !== 0).length;
 
-  const tabActive = userTab === 'all' ? activeFilter :
-    userTab === '__none__' ? activeFilter.filter((a) => !a.belongs_to_username) :
-    activeFilter.filter((a) => a.belongs_to_username === userTab);
-
+  const tabActive = userFiltered.filter((a) => a.is_active !== 0);
   const totalOutstanding = tabActive.reduce((s, a) => s + (a.balance ?? 0), 0);
   const totalLimit       = tabActive.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
 
