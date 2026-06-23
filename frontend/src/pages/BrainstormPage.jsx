@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Plus, Sparkles, Trash2, Pencil, X, ChevronRight, IndianRupee } from 'lucide-react';
+import { Plus, Sparkles, Trash2, Pencil, X, ChevronRight, IndianRupee, DollarSign } from 'lucide-react';
 import { useBrainstormList, useCreateBrainstormItem, useUpdateBrainstormItem, useDeleteBrainstormItem } from '../hooks/useBrainstorm';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -9,8 +9,8 @@ import { useToast } from '../contexts/ToastContext';
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500';
 
-function fmt(n) {
-  return Number(n ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+function fmt(n, currency = 'INR') {
+  return Number(n ?? 0).toLocaleString(currency === 'USD' ? 'en-US' : 'en-IN', { maximumFractionDigits: 0 });
 }
 
 function ItemModal({ item, onClose }) {
@@ -21,8 +21,8 @@ function ItemModal({ item, onClose }) {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     defaultValues: item
-      ? { name: item.name, total_amount: item.total_amount, notes: item.notes ?? '' }
-      : { name: '', total_amount: '', notes: '' },
+      ? { name: item.name, total_amount: item.total_amount, notes: item.notes ?? '', currency: item.currency ?? 'INR' }
+      : { name: '', total_amount: '', notes: '', currency: 'INR' },
   });
 
   async function onSubmit(data) {
@@ -31,6 +31,7 @@ function ItemModal({ item, onClose }) {
         name: data.name.trim(),
         total_amount: Number(data.total_amount),
         notes: data.notes?.trim() || null,
+        currency: data.currency,
       };
       if (isEdit) {
         await update.mutateAsync({ id: item.id, ...payload });
@@ -67,21 +68,30 @@ function ItemModal({ item, onClose }) {
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Total Amount Required (₹) *</label>
-            <input
-              {...register('total_amount', {
-                required: 'Amount is required',
-                min: { value: 1, message: 'Must be greater than 0' },
-                valueAsNumber: true,
-              })}
-              type="number"
-              step="1"
-              min="1"
-              className={inputCls}
-              placeholder="e.g. 50000"
-            />
-            {errors.total_amount && <p className="text-xs text-red-500 mt-1">{errors.total_amount.message}</p>}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Total Amount Required *</label>
+              <input
+                {...register('total_amount', {
+                  required: 'Amount is required',
+                  min: { value: 1, message: 'Must be greater than 0' },
+                  valueAsNumber: true,
+                })}
+                type="number"
+                step="1"
+                min="1"
+                className={inputCls}
+                placeholder="e.g. 50000"
+              />
+              {errors.total_amount && <p className="text-xs text-red-500 mt-1">{errors.total_amount.message}</p>}
+            </div>
+            <div className="w-28">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Currency</label>
+              <select {...register('currency')} className={inputCls}>
+                <option value="INR">₹ INR</option>
+                <option value="USD">$ USD</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -127,8 +137,14 @@ export default function BrainstormPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const items = data?.data ?? [];
-  const totalRequired = items.reduce((s, i) => s + Number(i.total_amount), 0);
-  const totalPaid = items.reduce((s, i) => s + Number(i.paid_amount), 0);
+  const sums = { INR: { required: 0, paid: 0 }, USD: { required: 0, paid: 0 } };
+  items.forEach((i) => {
+    const c = i.currency === 'USD' ? 'USD' : 'INR';
+    sums[c].required += Number(i.total_amount);
+    sums[c].paid += Number(i.paid_amount);
+  });
+  const hasINR = items.some((i) => i.currency !== 'USD');
+  const hasUSD = items.some((i) => i.currency === 'USD');
 
   async function handleDelete() {
     try {
@@ -160,15 +176,29 @@ export default function BrainstormPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-200 dark:border-violet-800 p-4">
             <p className="text-xs text-violet-500 dark:text-violet-400 font-medium mb-1">Total Required</p>
-            <p className="text-lg font-bold text-violet-700 dark:text-violet-300 flex items-center gap-0.5">
-              <IndianRupee size={15} className="shrink-0" />{fmt(totalRequired)}
-            </p>
+            {hasINR && (
+              <p className="text-lg font-bold text-violet-700 dark:text-violet-300 flex items-center gap-0.5">
+                <IndianRupee size={15} className="shrink-0" />{fmt(sums.INR.required)}
+              </p>
+            )}
+            {hasUSD && (
+              <p className="text-lg font-bold text-violet-700 dark:text-violet-300 flex items-center gap-0.5">
+                <DollarSign size={15} className="shrink-0" />{fmt(sums.USD.required, 'USD')}
+              </p>
+            )}
           </div>
           <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 p-4">
             <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-1">Total Paid</p>
-            <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
-              <IndianRupee size={15} className="shrink-0" />{fmt(totalPaid)}
-            </p>
+            {hasINR && (
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
+                <IndianRupee size={15} className="shrink-0" />{fmt(sums.INR.paid)}
+              </p>
+            )}
+            {hasUSD && (
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
+                <DollarSign size={15} className="shrink-0" />{fmt(sums.USD.paid, 'USD')}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -188,9 +218,13 @@ export default function BrainstormPage() {
           {items.map((item) => {
             const total = Number(item.total_amount);
             const paid = Number(item.paid_amount);
+            const given = Number(item.given_amount ?? 0);
             const remaining = Math.max(0, total - paid);
             const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
-            const done = paid >= total;
+            const pctGiven = total > 0 ? Math.min(100, (given / total) * 100) : 0;
+            const done = given >= total;
+            const currency = item.currency === 'USD' ? 'USD' : 'INR';
+            const Cur = currency === 'USD' ? DollarSign : IndianRupee;
 
             return (
               <div
@@ -207,16 +241,21 @@ export default function BrainstormPage() {
                           DONE
                         </span>
                       )}
+                      {!done && given > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shrink-0">
+                          IN PROGRESS
+                        </span>
+                      )}
                     </div>
                     {item.notes && (
                       <p className="text-xs text-gray-400 mt-0.5 truncate">{item.notes}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
                       <span className="flex items-center gap-0.5 text-violet-600 dark:text-violet-400 font-medium">
-                        <IndianRupee size={11} />{fmt(total)} required
+                        <Cur size={11} />{fmt(total, currency)} required
                       </span>
                       <span className="flex items-center gap-0.5 text-red-500 font-medium">
-                        <IndianRupee size={11} />{fmt(remaining)} left
+                        <Cur size={11} />{fmt(remaining, currency)} left
                       </span>
                     </div>
                   </div>
@@ -240,13 +279,17 @@ export default function BrainstormPage() {
 
                 {/* Progress bar */}
                 <div className="mt-3">
-                  <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="relative h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${done ? 'bg-emerald-500' : 'bg-violet-500'}`}
+                      className="absolute inset-y-0 left-0 rounded-full bg-emerald-200 dark:bg-emerald-900/70 transition-all"
                       style={{ width: `${pct}%` }}
                     />
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-amber-500 transition-all"
+                      style={{ width: `${pctGiven}%` }}
+                    />
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-1 text-right">{pct.toFixed(0)}% funded</p>
+                  <p className="text-[11px] text-gray-400 mt-1 text-right">{pctGiven.toFixed(0)}% given · {pct.toFixed(0)}% settled</p>
                 </div>
               </div>
             );

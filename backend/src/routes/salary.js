@@ -8,6 +8,18 @@ function getFirstAdminId() {
   return db.prepare('SELECT id FROM users WHERE is_admin = 1 ORDER BY id ASC LIMIT 1').get()?.id;
 }
 
+// Resolves and validates account_id for a credit entry: must be a credit-type account in the us workspace.
+function resolveAccountId(entryType, account_id) {
+  if (entryType !== 'credit') return { ok: true, accountId: null };
+  const accountId = account_id ? parseInt(account_id) : null;
+  if (!accountId) return { ok: false, error: 'account_id is required for credit entries' };
+  const account = db.prepare(
+    `SELECT a.* FROM accounts a WHERE a.id = ? AND a.type = 'credit' AND a.workspace = 'us' AND a.user_id IN (SELECT id FROM users WHERE is_admin = 1)`
+  ).get(accountId);
+  if (!account) return { ok: false, error: 'Invalid credit card account' };
+  return { ok: true, accountId };
+}
+
 // GET /api/salary/settings
 router.get('/settings', (req, res, next) => {
   try {
@@ -62,7 +74,7 @@ router.get('/', (req, res, next) => {
     const limit = 50;
     const offset = (parseInt(page) - 1) * limit;
 
-    let where = adminUserWhere;
+    let where = 's.' + adminUserWhere;
     const params = [];
 
     if (search) {
@@ -76,7 +88,8 @@ router.get('/', (req, res, next) => {
     ).get(...params).n;
 
     const rows = db.prepare(
-      `SELECT s.* FROM salary_entries s
+      `SELECT s.*, a.name AS account_name FROM salary_entries s
+       LEFT JOIN accounts a ON a.id = s.account_id
        WHERE ${where}
        ORDER BY ${sortCol} ${sortDir} LIMIT ? OFFSET ?`
     ).all(...params, limit, offset);
@@ -87,19 +100,28 @@ router.get('/', (req, res, next) => {
   }
 });
 
+function getEntryWithAccount(id) {
+  return db.prepare(
+    'SELECT s.*, a.name AS account_name FROM salary_entries s LEFT JOIN accounts a ON a.id = s.account_id WHERE s.id = ?'
+  ).get(id);
+}
+
 // POST /api/salary
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { description, amount, notes } = req.body;
+    const { description, amount, notes, account_id } = req.body;
+    const entryType = req.body.entry_type === 'credit' ? 'credit' : 'debit';
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
     if (parsedAmount !== null && parsedAmount < 0) return res.status(400).json({ error: 'amount cannot be negative' });
+    const resolved = resolveAccountId(entryType, account_id);
+    if (!resolved.ok) return res.status(400).json({ error: resolved.error });
     const targetId = getFirstAdminId();
     const result = db.prepare(
-      'INSERT INTO salary_entries (user_id, description, amount, notes) VALUES (?, ?, ?, ?)'
-    ).run(targetId, description.trim(), parsedAmount, notes?.trim() ?? null);
-    res.status(201).json({ data: db.prepare('SELECT * FROM salary_entries WHERE id = ?').get(result.lastInsertRowid) });
+      'INSERT INTO salary_entries (user_id, description, amount, notes, entry_type, account_id) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(targetId, description.trim(), parsedAmount, notes?.trim() ?? null, entryType, resolved.accountId);
+    res.status(201).json({ data: getEntryWithAccount(result.lastInsertRowid) });
   } catch (err) {
     next(err);
   }
@@ -111,14 +133,17 @@ router.put('/:id', (req, res, next) => {
   try {
     const row = db.prepare(`SELECT * FROM salary_entries WHERE id = ? AND ${adminUserWhere}`).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
-    const { description, amount, notes } = req.body;
+    const { description, amount, notes, account_id } = req.body;
+    const entryType = req.body.entry_type === 'credit' ? 'credit' : 'debit';
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
     if (parsedAmount !== null && parsedAmount < 0) return res.status(400).json({ error: 'amount cannot be negative' });
+    const resolved = resolveAccountId(entryType, account_id);
+    if (!resolved.ok) return res.status(400).json({ error: resolved.error });
     db.prepare(
-      'UPDATE salary_entries SET description = ?, amount = ?, notes = ? WHERE id = ?'
-    ).run(description.trim(), parsedAmount, notes?.trim() ?? null, row.id);
-    res.json({ data: db.prepare('SELECT * FROM salary_entries WHERE id = ?').get(row.id) });
+      'UPDATE salary_entries SET description = ?, amount = ?, notes = ?, entry_type = ?, account_id = ? WHERE id = ?'
+    ).run(description.trim(), parsedAmount, notes?.trim() ?? null, entryType, resolved.accountId, row.id);
+    res.json({ data: getEntryWithAccount(row.id) });
   } catch (err) {
     next(err);
   }

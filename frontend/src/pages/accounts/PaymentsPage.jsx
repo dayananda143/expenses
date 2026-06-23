@@ -132,7 +132,7 @@ export default function PaymentsPage() {
             <select {...register('account_id', { required: 'Select a card' })} className={inputCls}>
               <option value="">Select a card…</option>
               {creditAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name} — {fmtUSDDecimal(a.balance)} outstanding</option>
+                <option key={a.id} value={a.id}>{a.name}{a.belongs_to_username ? ` (${a.belongs_to_username})` : ''} — {fmtUSDDecimal(a.balance)} outstanding</option>
               ))}
             </select>
             {errors.account_id && <p className="text-xs text-red-500 mt-1">{errors.account_id.message}</p>}
@@ -218,7 +218,7 @@ export default function PaymentsPage() {
                 >
                   <option value="">All Cards</option>
                   {creditAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
+                    <option key={a.id} value={a.id}>{a.name}{a.belongs_to_username ? ` — ${a.belongs_to_username}` : ''}</option>
                   ))}
                 </select>
               </>
@@ -250,7 +250,14 @@ export default function PaymentsPage() {
                 >
                   <BankLogo name={p.account_name} sizeClass="w-8 h-8" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{p.account_name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{p.account_name}</p>
+                      {p.belongs_to_username && (
+                        <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                          {p.belongs_to_username}
+                        </span>
+                      )}
+                    </div>
                     {p.notes && <p className="text-xs text-gray-400 truncate">{p.notes}</p>}
                   </div>
                   <div className="text-right shrink-0">

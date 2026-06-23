@@ -726,6 +726,31 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_brainstorm_records_item ON brainstorm_records(item_id);
   `);
+  try { db.exec("ALTER TABLE brainstorm_records ADD COLUMN notes TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE brainstorm_records ADD COLUMN given_amount REAL NOT NULL DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE brainstorm_items ADD COLUMN currency TEXT NOT NULL DEFAULT 'INR'"); } catch {}
+
+  // Car finance
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS car_finance (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace        TEXT NOT NULL UNIQUE,
+      total_amount     REAL NOT NULL DEFAULT 0,
+      remaining_amount REAL NOT NULL DEFAULT 0,
+      remaining_months INTEGER NOT NULL DEFAULT 0,
+      due_date         TEXT DEFAULT NULL,
+      updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS car_finance_payments (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace  TEXT NOT NULL,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount     REAL NOT NULL CHECK (amount > 0),
+      date       TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_car_finance_payments_workspace ON car_finance_payments(workspace);
+  `);
 
   // Trips
   db.exec(`
@@ -743,6 +768,10 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id);
   `);
   try { db.exec("ALTER TABLE expenses ADD COLUMN trip_id INTEGER DEFAULT NULL REFERENCES trips(id) ON DELETE SET NULL"); } catch {}
+
+  // Salary entries: credit/debit type, with optional linked credit card account
+  try { db.exec("ALTER TABLE salary_entries ADD COLUMN entry_type TEXT NOT NULL DEFAULT 'debit'"); } catch {}
+  try { db.exec("ALTER TABLE salary_entries ADD COLUMN account_id INTEGER DEFAULT NULL REFERENCES accounts(id) ON DELETE SET NULL"); } catch {}
 }
 
 module.exports = { runMigrations };

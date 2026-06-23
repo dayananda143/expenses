@@ -77,6 +77,18 @@ export function useAddBrainstormRecord(itemId) {
   });
 }
 
+export function useUpdateBrainstormRecord(itemId) {
+  const qc = useQueryClient();
+  const { workspace } = useWorkspace();
+  return useMutation({
+    mutationFn: ({ id, ...data }) => client.put(`/brainstorm/${itemId}/records/${id}`, data, { params: { workspace } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['brainstorm-records', workspace, itemId] });
+      qc.invalidateQueries({ queryKey: ['brainstorm', workspace] });
+    },
+  });
+}
+
 export function useDeleteBrainstormRecord(itemId) {
   const qc = useQueryClient();
   const { workspace } = useWorkspace();

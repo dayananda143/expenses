@@ -24,7 +24,6 @@ import { useAuth } from '../contexts/AuthContext';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500';
-const selectCls = `${inputCls} appearance-none`;
 
 function MonthYearPicker({ month, year, onChange, onClear }) {
   const now = new Date();
@@ -98,7 +97,7 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
   const baseSubtypes = selectedCategoryId ? (subtypesByCategory[String(selectedCategoryId)] ?? []) : [];
   const subtypeIds = new Set(baseSubtypes.map((s) => s.id));
   const subtypes = [...baseSubtypes, ...extraSubtypes.filter((s) => !subtypeIds.has(s.id))];
-  const datalistId = `subtypes-${selectedCategoryId}`;
+  const currentSubtype = watch('subtype');
 
   async function handleAddCategory() {
     if (!newCatName.trim()) return;
@@ -159,7 +158,7 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
                   <Plus size={12} /> Add category
                 </button>
               </div>
-              <select {...register('category_id', { required: 'Category is required' })} className={selectCls}>
+              <select {...register('category_id', { required: 'Category is required' })} className={inputCls}>
                 <option value="">— Select a category —</option>
                 {allCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -209,18 +208,13 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
                   </button>
                 )}
               </div>
-              <input
-                {...register('subtype')}
-                list={datalistId}
-                className={inputCls}
-                placeholder={subtypes.length ? `e.g. ${subtypes[0].name}` : 'Type or store name'}
-                autoComplete="off"
-              />
-              {subtypes.length > 0 && (
-                <datalist id={datalistId}>
-                  {subtypes.map((s) => <option key={s.id} value={s.name} />)}
-                </datalist>
-              )}
+              <select {...register('subtype')} className={inputCls}>
+                <option value="">{subtypes.length ? '— Select type / store —' : 'No types yet'}</option>
+                {subtypes.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                {currentSubtype && !subtypes.some((s) => s.name === currentSubtype) && (
+                  <option value={currentSubtype}>{currentSubtype}</option>
+                )}
+              </select>
               {showAddSubtype && (
                 <div className="mt-2 flex gap-2">
                   <input
@@ -566,7 +560,7 @@ export default function ExpensesPage() {
               className={`${inputCls} pl-8`}
             />
           </div>
-          <select value={filters.category_id} onChange={(e) => setFilter('category_id', e.target.value)} className={selectCls}>
+          <select value={filters.category_id} onChange={(e) => setFilter('category_id', e.target.value)} className={inputCls}>
             <option value="">All Categories</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>

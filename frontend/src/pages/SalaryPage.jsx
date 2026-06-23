@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, DollarSign, Wallet, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, DollarSign, Wallet, Check, CreditCard } from 'lucide-react';
 import {
   useSalaryEntries,
   useSalarySummary,
@@ -10,6 +10,7 @@ import {
   useUpdateSalaryEntry,
   useDeleteSalaryEntry,
 } from '../hooks/useSalary';
+import { useAccounts } from '../hooks/useAccounts';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
@@ -91,12 +92,15 @@ function SalaryModal({ entry, onClose }) {
   const create = useCreateSalaryEntry();
   const update = useUpdateSalaryEntry();
   const isEdit = !!entry?.id;
+  const { data: accountsData } = useAccounts('us');
+  const creditCards = (accountsData?.data ?? []).filter((a) => a.type === 'credit' && !a.archived);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     defaultValues: entry
-      ? { description: entry.description, amount: entry.amount, notes: entry.notes ?? '' }
-      : {},
+      ? { description: entry.description, amount: entry.amount, notes: entry.notes ?? '', entry_type: entry.entry_type ?? 'debit', account_id: entry.account_id ?? '' }
+      : { entry_type: 'debit' },
   });
+  const entryType = watch('entry_type');
 
   async function onSubmit(data) {
     try {
@@ -104,6 +108,8 @@ function SalaryModal({ entry, onClose }) {
         description: data.description,
         amount: data.amount !== '' && data.amount != null ? parseFloat(data.amount) : null,
         notes: data.notes || null,
+        entry_type: data.entry_type,
+        account_id: data.entry_type === 'credit' && data.account_id ? parseInt(data.account_id) : null,
       };
       if (isEdit) { await update.mutateAsync({ id: entry.id, ...payload }); toast('Entry updated'); }
       else        { await create.mutateAsync(payload); toast('Entry added'); }
@@ -129,6 +135,37 @@ function SalaryModal({ entry, onClose }) {
             <input {...register('description', { required: 'Required' })} className={inputCls} placeholder="e.g. Rent, Groceries, Insurance" />
             {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+            <div className="flex gap-2">
+              <label className={`flex-1 flex items-center justify-center gap-1.5 border rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors ${entryType === 'debit' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'}`}>
+                <input type="radio" value="debit" {...register('entry_type')} className="hidden" />
+                Debit
+              </label>
+              <label className={`flex-1 flex items-center justify-center gap-1.5 border rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors ${entryType === 'credit' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'}`}>
+                <input type="radio" value="credit" {...register('entry_type')} className="hidden" />
+                Credit
+              </label>
+            </div>
+          </div>
+          {entryType === 'credit' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Credit Card *</label>
+              <select
+                {...register('account_id', { required: entryType === 'credit' ? 'Required' : false })}
+                className={inputCls}
+              >
+                <option value="">Select a card...</option>
+                {creditCards.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              {creditCards.length === 0 && (
+                <p className="text-xs text-amber-500 mt-1">No credit cards found. Add one under Accounts &rarr; Credit Cards.</p>
+              )}
+              {errors.account_id && <p className="text-xs text-red-500 mt-1">{errors.account_id.message}</p>}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (USD)</label>
             <div className="relative">
@@ -259,6 +296,7 @@ export default function SalaryPage() {
                   <th onClick={() => handleSort('description')} className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors">
                     <span className="inline-flex items-center gap-1">Description <SortIcon field="description" sort={sort} order={order} /></span>
                   </th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-400">Type</th>
                   <th onClick={() => handleSort('amount')} className="px-4 py-3 text-right font-semibold text-gray-600 dark:text-gray-400 cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors">
                     <span className="inline-flex items-center gap-1 flex-row-reverse">Amount (USD) <SortIcon field="amount" sort={sort} order={order} /></span>
                   </th>
@@ -268,7 +306,7 @@ export default function SalaryPage() {
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
                       No entries yet. Add an expense to track against your salary.
                     </td>
                   </tr>
@@ -278,6 +316,17 @@ export default function SalaryPage() {
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800 dark:text-gray-200">{row.description}</p>
                       {row.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{row.notes}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.entry_type === 'credit' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300">
+                          <CreditCard size={11} /> {row.account_name ?? 'Credit'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                          Debit
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
                       {row.amount != null

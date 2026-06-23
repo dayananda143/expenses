@@ -6,3 +6,9 @@ backend/data/*.db-wal
 .env
 *.env.local
 backend/uploads/
+
+# Local tooling
+.claude/
+.codegraph/
+.agents/
+skills-lock.json

@@ -24,9 +24,10 @@ function getFirstAdminId() {
 router.get('/', (req, res, next) => {
   try {
     const rows = db.prepare(`
-      SELECT p.*, a.name AS account_name, a.type AS account_type
+      SELECT p.*, a.name AS account_name, a.type AS account_type, u.username AS belongs_to_username
       FROM account_payments p
       JOIN accounts a ON a.id = p.account_id
+      LEFT JOIN users u ON u.id = a.belongs_to_user_id
       WHERE ${adminUserWhere} AND p.workspace = ?
       ORDER BY p.date DESC, p.created_at DESC
     `).all(req.workspace);

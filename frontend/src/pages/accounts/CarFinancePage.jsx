@@ -1,20 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Car, DollarSign, CalendarClock, Wallet, Pencil, X, Check, CreditCard, Trash2, SquarePen, CalendarDays } from 'lucide-react';
+import {
+  useCarFinance,
+  useUpdateCarFinance,
+  useRecordCarFinancePayment,
+  useUpdateCarFinancePayment,
+  useDeleteCarFinancePayment,
+  useImportCarFinance,
+} from '../../hooks/useCarFinance';
+import { useAuth } from '../../contexts/AuthContext';
 
-const CONFIG_KEY   = 'car_finance_config';
-const PAYMENTS_KEY = 'car_finance_payments';
+const WS = 'us';
 
-function loadConfig() {
-  try { const r = localStorage.getItem(CONFIG_KEY); if (r) return JSON.parse(r); } catch {}
-  return { totalAmount: 0, remainingAmount: 0, remainingMonths: 0, dueDate: '' };
+// Legacy localStorage keys from before car finance moved to the shared database.
+const LEGACY_CONFIG_KEY   = 'car_finance_config';
+const LEGACY_PAYMENTS_KEY = 'car_finance_payments';
+
+function loadLegacyData() {
+  try {
+    const config = JSON.parse(localStorage.getItem(LEGACY_CONFIG_KEY) ?? 'null');
+    const payments = JSON.parse(localStorage.getItem(LEGACY_PAYMENTS_KEY) ?? 'null') ?? [];
+    if (config && (config.totalAmount > 0 || config.remainingAmount > 0 || payments.length > 0)) {
+      return { config, payments };
+    }
+  } catch {}
+  return null;
 }
-function saveConfig(d) { localStorage.setItem(CONFIG_KEY, JSON.stringify(d)); window.dispatchEvent(new CustomEvent('carFinanceUpdated')); }
 
-function loadPayments() {
-  try { const r = localStorage.getItem(PAYMENTS_KEY); if (r) return JSON.parse(r); } catch {}
-  return [];
+function toUiConfig(row) {
+  return {
+    totalAmount:     row?.total_amount ?? 0,
+    remainingAmount: row?.remaining_amount ?? 0,
+    remainingMonths: row?.remaining_months ?? 0,
+    dueDate:         row?.due_date ?? '',
+  };
 }
-function savePayments(p) { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(p)); }
 
 function fmtUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n ?? 0);
@@ -48,8 +68,39 @@ const inputCls = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl 
 const labelCls = 'block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide';
 
 export default function CarFinancePage() {
-  const [config, setConfig]     = useState(loadConfig);
-  const [payments, setPayments] = useState(loadPayments);
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
+
+  const { data, isLoading } = useCarFinance(WS);
+  const updateCarFinance     = useUpdateCarFinance(WS);
+  const recordPayment        = useRecordCarFinancePayment(WS);
+  const updatePayment        = useUpdateCarFinancePayment(WS);
+  const deletePayment        = useDeleteCarFinancePayment(WS);
+  const importCarFinance     = useImportCarFinance(WS);
+
+  const config   = toUiConfig(data?.data?.config);
+  const payments = data?.data?.payments ?? [];
+
+  // One-time migration: push pre-existing browser localStorage data into the
+  // shared database so it isn't lost and other users can see it.
+  const migrationAttempted = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || isLoading || migrationAttempted.current) return;
+    if (config.totalAmount > 0 || config.remainingAmount > 0 || payments.length > 0) return;
+    const legacy = loadLegacyData();
+    if (!legacy) return;
+    migrationAttempted.current = true;
+    importCarFinance.mutate(
+      { ...legacy.config, payments: legacy.payments },
+      {
+        onSuccess: () => {
+          localStorage.removeItem(LEGACY_CONFIG_KEY);
+          localStorage.removeItem(LEGACY_PAYMENTS_KEY);
+        },
+      }
+    );
+  }, [isAdmin, isLoading, config.totalAmount, config.remainingAmount, payments.length, importCarFinance]);
+
   const [editing, setEditing]   = useState(false);
   const [draft, setDraft]       = useState(config);
   const [paying, setPaying]     = useState(false);
@@ -68,15 +119,12 @@ export default function CarFinancePage() {
   function openEdit() { setDraft(config); setEditing(true); }
 
   function handleSave() {
-    const next = {
+    updateCarFinance.mutate({
       totalAmount:     parseFloat(draft.totalAmount)    || 0,
       remainingAmount: parseFloat(draft.remainingAmount) || 0,
       remainingMonths: parseInt(draft.remainingMonths)   || 0,
       dueDate:         draft.dueDate || '',
-    };
-    saveConfig(next);
-    setConfig(next);
-    setEditing(false);
+    }, { onSuccess: () => setEditing(false) });
   }
 
   function openPay() {
@@ -88,38 +136,13 @@ export default function CarFinancePage() {
 
   function handleRecordPayment() {
     const amount = parseFloat(payAmount);
-    if (!amount || amount <= 0)           { setPayError('Enter a valid amount.');           return; }
-    if (!payDate)                         { setPayError('Select a date.');                  return; }
-    if (amount > config.remainingAmount)  { setPayError('Amount exceeds remaining balance.'); return; }
+    if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
+    if (!payDate)                { setPayError('Select a date.');       return; }
 
-    let nextDueDate = config.dueDate;
-    if (config.dueDate) {
-      const day = parseInt(config.dueDate.split('-')[2]);
-      const paid = new Date(payDate + 'T00:00:00');
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const thisMonthDue = new Date(now.getFullYear(), now.getMonth(), day);
-      const baseDue = thisMonthDue >= today ? thisMonthDue : new Date(now.getFullYear(), now.getMonth() + 1, day);
-      const cycleStart = new Date(baseDue.getFullYear(), baseDue.getMonth() - 1, day);
-      const next = paid >= cycleStart
-        ? new Date(baseDue.getFullYear(), baseDue.getMonth() + 1, day)
-        : baseDue;
-      nextDueDate = next.toLocaleDateString('en-CA');
-    }
-    const nextConfig = {
-      ...config,
-      remainingAmount: Math.max(0, config.remainingAmount - amount),
-      remainingMonths: Math.max(0, config.remainingMonths - 1),
-      dueDate: nextDueDate,
-    };
-    const newPayment = { id: Date.now(), date: payDate, amount };
-    const nextPayments = [newPayment, ...payments];
-
-    saveConfig(nextConfig);
-    savePayments(nextPayments);
-    setConfig(nextConfig);
-    setPayments(nextPayments);
-    setPaying(false);
+    recordPayment.mutate({ amount, date: payDate }, {
+      onSuccess: () => setPaying(false),
+      onError: (err) => setPayError(err?.error ?? 'Failed to record payment.'),
+    });
   }
 
   function openEditPayment(p) {
@@ -133,33 +156,17 @@ export default function CarFinancePage() {
     const amount = parseFloat(editAmount);
     if (!amount || amount <= 0) { setEditError('Enter a valid amount.'); return; }
     if (!editDate)              { setEditError('Select a date.');         return; }
-    const diff = amount - editingPayment.amount;
-    if (diff > config.remainingAmount) { setEditError('Amount exceeds remaining balance.'); return; }
-    const nextConfig = { ...config, remainingAmount: Math.max(0, config.remainingAmount - diff) };
-    const nextPayments = payments.map(p =>
-      p.id === editingPayment.id ? { ...p, date: editDate, amount } : p
-    );
-    saveConfig(nextConfig);
-    savePayments(nextPayments);
-    setConfig(nextConfig);
-    setPayments(nextPayments);
-    setEditingPayment(null);
+
+    updatePayment.mutate({ id: editingPayment.id, amount, date: editDate }, {
+      onSuccess: () => setEditingPayment(null),
+      onError: (err) => setEditError(err?.error ?? 'Failed to save payment.'),
+    });
   }
 
   function confirmDeletePayment() {
     const p = deletingPayment;
     if (!p) return;
-    const nextConfig = {
-      ...config,
-      remainingAmount: config.remainingAmount + p.amount,
-      remainingMonths: config.remainingMonths + 1,
-    };
-    const nextPayments = payments.filter(x => x.id !== p.id);
-    saveConfig(nextConfig);
-    savePayments(nextPayments);
-    setConfig(nextConfig);
-    setPayments(nextPayments);
-    setDeletingPayment(null);
+    deletePayment.mutate(p.id, { onSuccess: () => setDeletingPayment(null) });
   }
 
   return (
@@ -175,135 +182,145 @@ export default function CarFinancePage() {
             <p className="text-xs text-gray-400">Loan overview</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={openPay}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl transition-colors"
-          >
-            <CreditCard size={13} /> Record Payment
-          </button>
-          <button
-            onClick={openEdit}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 rounded-xl transition-colors"
-          >
-            <Pencil size={13} /> Edit
-          </button>
-        </div>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={DollarSign}
-          iconBg="bg-violet-100 dark:bg-violet-900/30"
-          iconColor="text-violet-600 dark:text-violet-400"
-          label="Total Amount"
-          value={fmtUSD(config.totalAmount)}
-          sub="Original loan"
-        />
-        <StatCard
-          icon={Wallet}
-          iconBg="bg-rose-100 dark:bg-rose-900/30"
-          iconColor="text-rose-600 dark:text-rose-400"
-          label="Remaining Amount"
-          value={fmtUSD(config.remainingAmount)}
-          sub={config.totalAmount > 0 ? `${paidPct}% paid` : null}
-          subColor="text-emerald-500"
-        />
-        <StatCard
-          icon={CalendarClock}
-          iconBg="bg-amber-100 dark:bg-amber-900/30"
-          iconColor="text-amber-600 dark:text-amber-400"
-          label="Remaining Months"
-          value={config.remainingMonths}
-          sub={config.remainingMonths === 1 ? '1 month left' : config.remainingMonths > 0 ? `${config.remainingMonths} months left` : null}
-        />
-        <StatCard
-          icon={CalendarDays}
-          iconBg="bg-sky-100 dark:bg-sky-900/30"
-          iconColor="text-sky-600 dark:text-sky-400"
-          label="Due Date"
-          value={config.dueDate ? fmtDate(config.dueDate) : '—'}
-          sub={config.dueDate ? (() => {
-            const diff = Math.ceil((new Date(config.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-            if (diff < 0) return 'Overdue';
-            if (diff === 0) return 'Due today';
-            return `In ${diff} day${diff !== 1 ? 's' : ''}`;
-          })() : null}
-          subColor={config.dueDate && Math.ceil((new Date(config.dueDate) - new Date()) / (1000 * 60 * 60 * 24)) < 0 ? 'text-red-500' : 'text-sky-500'}
-        />
-      </div>
-
-      {/* Progress bar */}
-      {config.totalAmount > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 space-y-3">
-          <div className="flex items-center justify-between text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            <span>Repayment progress</span>
-            <span>{paidPct}%</span>
-          </div>
-          <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full transition-all duration-500"
-              style={{ width: `${paidPct}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Paid: {fmtUSD(paidAmount)}</span>
-            <span>Remaining: {fmtUSD(config.remainingAmount)}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Payments table */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-          <p className="text-sm font-bold text-gray-900 dark:text-white">Payment History</p>
-          <span className="text-xs text-gray-400">{payments.length} payment{payments.length !== 1 ? 's' : ''}</span>
-        </div>
-        {payments.length === 0 ? (
-          <div className="px-5 py-10 text-center text-sm text-gray-400">No payments recorded yet.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/50">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">#</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {payments.map((p, i) => (
-                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                    <td className="px-5 py-3.5 text-gray-400 text-xs">{payments.length - i}</td>
-                    <td className="px-5 py-3.5 text-gray-700 dark:text-gray-300 font-medium">{fmtDate(p.date)}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmtUSD(p.amount)}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => openEditPayment(p)}
-                          className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-violet-500 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
-                          title="Edit payment"
-                        >
-                          <SquarePen size={13} />
-                        </button>
-                        <button
-                          onClick={() => setDeletingPayment(p)}
-                          className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          title="Delete payment"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openPay}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl transition-colors"
+            >
+              <CreditCard size={13} /> Record Payment
+            </button>
+            <button
+              onClick={openEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 rounded-xl transition-colors"
+            >
+              <Pencil size={13} /> Edit
+            </button>
           </div>
         )}
       </div>
+
+      {isLoading ? (
+        <div className="py-10 text-center text-sm text-gray-400">Loading...</div>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              icon={DollarSign}
+              iconBg="bg-violet-100 dark:bg-violet-900/30"
+              iconColor="text-violet-600 dark:text-violet-400"
+              label="Total Amount"
+              value={fmtUSD(config.totalAmount)}
+              sub="Original loan"
+            />
+            <StatCard
+              icon={Wallet}
+              iconBg="bg-rose-100 dark:bg-rose-900/30"
+              iconColor="text-rose-600 dark:text-rose-400"
+              label="Remaining Amount"
+              value={fmtUSD(config.remainingAmount)}
+              sub={config.totalAmount > 0 ? `${paidPct}% paid` : null}
+              subColor="text-emerald-500"
+            />
+            <StatCard
+              icon={CalendarClock}
+              iconBg="bg-amber-100 dark:bg-amber-900/30"
+              iconColor="text-amber-600 dark:text-amber-400"
+              label="Remaining Months"
+              value={config.remainingMonths}
+              sub={config.remainingMonths === 1 ? '1 month left' : config.remainingMonths > 0 ? `${config.remainingMonths} months left` : null}
+            />
+            <StatCard
+              icon={CalendarDays}
+              iconBg="bg-sky-100 dark:bg-sky-900/30"
+              iconColor="text-sky-600 dark:text-sky-400"
+              label="Due Date"
+              value={config.dueDate ? fmtDate(config.dueDate) : '—'}
+              sub={config.dueDate ? (() => {
+                const diff = Math.ceil((new Date(config.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                if (diff < 0) return 'Overdue';
+                if (diff === 0) return 'Due today';
+                return `In ${diff} day${diff !== 1 ? 's' : ''}`;
+              })() : null}
+              subColor={config.dueDate && Math.ceil((new Date(config.dueDate) - new Date()) / (1000 * 60 * 60 * 24)) < 0 ? 'text-red-500' : 'text-sky-500'}
+            />
+          </div>
+
+          {/* Progress bar */}
+          {config.totalAmount > 0 && (
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 space-y-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <span>Repayment progress</span>
+                <span>{paidPct}%</span>
+              </div>
+              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full transition-all duration-500"
+                  style={{ width: `${paidPct}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Paid: {fmtUSD(paidAmount)}</span>
+                <span>Remaining: {fmtUSD(config.remainingAmount)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Payments table */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Payment History</p>
+              <span className="text-xs text-gray-400">{payments.length} payment{payments.length !== 1 ? 's' : ''}</span>
+            </div>
+            {payments.length === 0 ? (
+              <div className="px-5 py-10 text-center text-sm text-gray-400">No payments recorded yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800/50">
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">#</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</th>
+                      <th className="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
+                      {isAdmin && <th className="px-5 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide w-10"></th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {payments.map((p, i) => (
+                      <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                        <td className="px-5 py-3.5 text-gray-400 text-xs">{payments.length - i}</td>
+                        <td className="px-5 py-3.5 text-gray-700 dark:text-gray-300 font-medium">{fmtDate(p.date)}</td>
+                        <td className="px-5 py-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmtUSD(p.amount)}</td>
+                        {isAdmin && (
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEditPayment(p)}
+                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-violet-500 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                                title="Edit payment"
+                              >
+                                <SquarePen size={13} />
+                              </button>
+                              <button
+                                onClick={() => setDeletingPayment(p)}
+                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                title="Delete payment"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Delete confirmation dialog */}
       {deletingPayment && (
