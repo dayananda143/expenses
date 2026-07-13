@@ -49,6 +49,11 @@ function fmtDate(iso) {
   return `${d}/${m}/${y}`;
 }
 
+function fmtDueDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${m}/${d}/${y}`;
+}
+
 function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 flex items-start gap-4">
@@ -104,7 +109,7 @@ export default function CarFinancePage() {
   const [editing, setEditing]   = useState(false);
   const [draft, setDraft]       = useState(config);
   const [paying, setPaying]     = useState(false);
-  const [payAmount, setPayAmount] = useState('');
+  const [payAmount, setPayAmount] = useState('777.69');
   const [payDate, setPayDate]     = useState(today());
   const [payError, setPayError]   = useState('');
   const [editingPayment, setEditingPayment] = useState(null);
@@ -128,7 +133,7 @@ export default function CarFinancePage() {
   }
 
   function openPay() {
-    setPayAmount('');
+    setPayAmount('777.69');
     setPayDate(today());
     setPayError('');
     setPaying(true);
@@ -236,7 +241,7 @@ export default function CarFinancePage() {
               iconBg="bg-sky-100 dark:bg-sky-900/30"
               iconColor="text-sky-600 dark:text-sky-400"
               label="Due Date"
-              value={config.dueDate ? fmtDate(config.dueDate) : '—'}
+              value={config.dueDate ? fmtDueDate(config.dueDate) : '—'}
               sub={config.dueDate ? (() => {
                 const diff = Math.ceil((new Date(config.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
                 if (diff < 0) return 'Overdue';

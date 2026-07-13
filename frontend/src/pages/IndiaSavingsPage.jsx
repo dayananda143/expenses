@@ -669,6 +669,11 @@ function LentList({ items, isAdmin, onEdit, onDelete }) {
     return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
+  function fmtDueDate(d) {
+    if (!d) return null;
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  }
+
   function renderItem(item) {
     const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pending;
     const Icon = cfg.Icon;
@@ -688,7 +693,7 @@ function LentList({ items, isAdmin, onEdit, onDelete }) {
           <p className="text-xl font-bold text-rose-600 dark:text-rose-400">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-gray-400">
             {item.date_lent && <span>Lent: {fmtD(item.date_lent)}</span>}
-            {item.due_date  && <span className={overdue ? 'text-red-500 font-semibold' : ''}>Due: {fmtD(item.due_date)}{overdue ? ' (overdue)' : ''}</span>}
+            {item.due_date  && <span className={overdue ? 'text-red-500 font-semibold' : ''}>Due: {fmtDueDate(item.due_date)}{overdue ? ' (overdue)' : ''}</span>}
           </div>
           {item.notes && <p className="text-xs text-gray-400 mt-1 italic">{item.notes}</p>}
         </div>

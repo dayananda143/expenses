@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import {
   ArrowLeft, Plus, Pencil, Trash2, X, GripVertical,
-  CreditCard, PiggyBank, CalendarClock, Calendar,
+  CreditCard, PiggyBank, CalendarClock, Calendar, Car,
   EyeOff, Eye, TrendingUp, Wallet, ShieldCheck, AlertCircle, Sun, Moon,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -12,6 +12,7 @@ import {
   useAccounts, useCreateAccount, useUpdateAccount,
   useDeleteAccount, useReorderAccounts,
 } from '../hooks/useAccounts';
+import { useCarFinance } from '../hooks/useCarFinance';
 
 // Accounts are workspace-agnostic here — stored under 'us', displayed in USD
 const WS = 'us';
@@ -39,6 +40,10 @@ function daysFromToday(date) {
 
 function fmtDate(date) {
   return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function fmtDueDate(date) {
+  return new Date(date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
@@ -99,12 +104,27 @@ function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub }) {
 
 // ─── Upcoming payments ────────────────────────────────────────────────────────
 
-function UpcomingPayments({ creditAccounts }) {
+function UpcomingPayments({ creditAccounts, carFinance }) {
   const upcoming = creditAccounts
     .filter(a => a.due_day && a.is_active)
     .map(a => ({ ...a, dueDate: nextDueDate(a.due_day), days: daysFromToday(nextDueDate(a.due_day)) }))
-    .filter(a => a.days !== null && a.days <= 30)
-    .sort((a, b) => a.days - b.days);
+    .filter(a => a.days !== null && a.days <= 30);
+
+  if (carFinance?.dueDate) {
+    const days = daysFromToday(carFinance.dueDate);
+    if (days !== null && days <= 30) {
+      upcoming.push({
+        id: 'car-finance',
+        name: 'Car Finance',
+        balance: carFinance.remainingAmount,
+        dueDate: carFinance.dueDate,
+        days,
+        isCarFinance: true,
+      });
+    }
+  }
+
+  upcoming.sort((a, b) => a.days - b.days);
 
   if (upcoming.length === 0) return null;
 
@@ -125,10 +145,12 @@ function UpcomingPayments({ creditAccounts }) {
           return (
             <div key={a.id} className={`flex items-center justify-between rounded-xl border px-4 py-2.5 ${urgency}`}>
               <div className="flex items-center gap-2.5">
-                <CreditCard size={14} className="text-gray-400" />
+                {a.isCarFinance
+                  ? <Car size={14} className="text-gray-400" />
+                  : <CreditCard size={14} className="text-gray-400" />}
                 <div>
                   <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{a.name}</p>
-                  <p className="text-xs text-gray-400">{fmtDate(a.dueDate)}</p>
+                  <p className="text-xs text-gray-400">{fmtDueDate(a.dueDate)}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -356,6 +378,11 @@ export default function AccountsPage() {
   const { data, isLoading } = useAccounts(WS);
   const deleteAccount = useDeleteAccount(WS);
   const reorder       = useReorderAccounts(WS);
+  const { data: carFinanceData } = useCarFinance(WS);
+  const carFinance = {
+    remainingAmount: carFinanceData?.data?.config?.remaining_amount ?? 0,
+    dueDate:         carFinanceData?.data?.config?.due_date ?? '',
+  };
 
   const [modal, setModal]               = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -466,7 +493,7 @@ export default function AccountsPage() {
         )}
 
         {/* Upcoming payments */}
-        {!isLoading && <UpcomingPayments creditAccounts={credit} />}
+        {!isLoading && <UpcomingPayments creditAccounts={credit} carFinance={carFinance} />}
 
         {/* Empty state */}
         {!isLoading && ordered.length === 0 && (
