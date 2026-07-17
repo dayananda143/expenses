@@ -20,13 +20,13 @@ function daysSince(dateStr) {
   return Math.floor(diff / 86400000);
 }
 
-function BatchModal({ initial, onClose, onSave }) {
+function BatchModal({ initial, initialDeaths, onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10);
   const defaultEnd = addDays(today, CYCLE_DAYS);
   const [form, setForm] = useState(
     initial
-      ? { name: initial.name, bird_type: initial.bird_type, count: initial.count, date_added: initial.date_added, end_date: initial.end_date ?? '', notes: initial.notes ?? '' }
-      : { name: '', bird_type: 'chicken', count: '', date_added: today, end_date: defaultEnd, notes: '' }
+      ? { name: initial.name, bird_type: initial.bird_type, count: initial.count, date_added: initial.date_added, end_date: initial.end_date ?? '', notes: initial.notes ?? '', deaths: initialDeaths ? String(initialDeaths) : '' }
+      : { name: '', bird_type: 'chicken', count: '', date_added: today, end_date: defaultEnd, notes: '', deaths: '' }
   );
   const [saving, setSaving] = useState(false);
 
@@ -39,12 +39,26 @@ function BatchModal({ initial, onClose, onSave }) {
     setSaving(true);
     const method = initial ? 'PATCH' : 'POST';
     const url = initial ? `${API}/${initial.id}` : API;
+    const { deaths, ...batchForm } = form;
     const r = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-      body: JSON.stringify({ ...form, count: Number(form.count), end_date: form.end_date || null }),
+      body: JSON.stringify({ ...batchForm, count: Number(batchForm.count), end_date: batchForm.end_date || null }),
     });
     const j = await r.json();
+
+    // Optional deaths field: reconcile against existing mortality total with a single
+    // adjustment record, rather than rewriting the individual dated mortality log.
+    const newDeaths = deaths === '' ? 0 : Number(deaths);
+    const delta = newDeaths - (initialDeaths ?? 0);
+    if (j.data && delta !== 0) {
+      await fetch('/api/poultry/mortality', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ flock_id: j.data.id, date: today, count: delta, cause: 'Batch edit adjustment' }),
+      });
+    }
+
     setSaving(false);
     if (j.data) onSave(j.data);
   }
@@ -96,6 +110,11 @@ function BatchModal({ initial, onClose, onSave }) {
             <input type="date" value={form.end_date} onChange={e => f('end_date', e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Auto-set to 60 days from placement — adjust as needed</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Deaths (optional)</label>
+            <input type="number" min="0" value={form.deaths} onChange={e => f('deaths', e.target.value)} placeholder="0"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notes</label>
@@ -229,9 +248,15 @@ function BatchCard({ batch, deaths, bill, onEdit, onDelete, onMarkSold, onUpload
             <p className="text-xs text-gray-400 dark:text-gray-500">EEF</p>
           </div>
           <div>
-            <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {bill.net_pay ? `₹${new Intl.NumberFormat('en-IN').format(bill.net_pay)}` : '—'}
-            </p>
+            <div className="flex items-center justify-center gap-1">
+              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                {bill.net_pay ? `₹${new Intl.NumberFormat('en-IN').format(bill.net_pay)}` : '—'}
+              </p>
+              <button onClick={() => onUploadBill(batch)} title="Edit Net Pay"
+                className="p-0.5 rounded text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+                <Pencil size={10} />
+              </button>
+            </div>
             <p className="text-xs text-gray-400 dark:text-gray-500">Net Pay</p>
           </div>
         </div>
@@ -283,6 +308,7 @@ export default function PoultryFlockPage() {
       return idx >= 0 ? p.map(x => x.id === row.id ? row : x) : [row, ...p];
     });
     setModal(null);
+    load(); // refresh mortality totals in case the batch modal recorded a deaths adjustment
   }
 
   function onBillSaved(bill) {
@@ -357,7 +383,8 @@ export default function PoultryFlockPage() {
                 {sold.map(b => (
                   <BatchCard key={b.id} batch={b} deaths={deaths[b.id]} bill={bills[b.id]}
                     onEdit={() => setModal(b)} onDelete={() => del(b.id)} onMarkSold={markSold}
-                    onUploadBill={batch => setBillModal({ flockId: batch.id, existingBill: bills[batch.id] ?? null })} />
+                    onUploadBill={batch => setBillModal({ flockId: batch.id, existingBill: bills[batch.id] ?? null })}
+                    onViewExpenses={viewExpenses} />
                 ))}
               </div>
             </div>
@@ -368,6 +395,7 @@ export default function PoultryFlockPage() {
       {modal && (
         <BatchModal
           initial={modal === 'add' ? null : modal}
+          initialDeaths={modal === 'add' ? 0 : (deaths[modal.id] ?? 0)}
           onClose={() => setModal(null)}
           onSave={onSave}
         />

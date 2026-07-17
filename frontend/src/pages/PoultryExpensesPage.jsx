@@ -73,7 +73,15 @@ function ExpenseModal({ initial, onClose, onSave, flockId }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label>
-              <select value={form.category} onChange={e => f('category', e.target.value)}
+              <select value={form.category} onChange={e => {
+                const category = e.target.value;
+                const DEFAULT_DESC = { pottu_sold: 'Pottu Sold', feed_bags_sold: 'Feed Bags Sold' };
+                setForm(p => ({
+                  ...p,
+                  category,
+                  description: !p.description && DEFAULT_DESC[category] ? DEFAULT_DESC[category] : p.description,
+                }));
+              }}
                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500">
                 <optgroup label="Expenses">
                   {CATEGORIES.map(c => <option key={c} value={c}>{CAT_LABELS[c] ?? c}</option>)}
@@ -233,6 +241,10 @@ export default function PoultryExpensesPage() {
   const [bulkCat, setBulkCat] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [netPay, setNetPay] = useState(0);
+  const [netPayBillId, setNetPayBillId] = useState(null);
+  const [editingNetPay, setEditingNetPay] = useState(false);
+  const [netPayDraft, setNetPayDraft] = useState('');
+  const [savingNetPay, setSavingNetPay] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -267,10 +279,44 @@ export default function PoultryExpensesPage() {
       const billJ = await billR.json();
       const bills = billJ.data ?? [];
       setNetPay(bills.reduce((s, b) => s + (b.net_pay ?? 0), 0));
+      setNetPayBillId(bills[0]?.id ?? null);
     } else {
       setNetPay(0);
+      setNetPayBillId(null);
     }
     setLoading(false);
+  }
+
+  function startEditNetPay() {
+    setNetPayDraft(String(netPay || ''));
+    setEditingNetPay(true);
+  }
+
+  async function saveNetPay() {
+    const amount = parseFloat(netPayDraft);
+    setEditingNetPay(false);
+    if (isNaN(amount) || amount === netPay) return;
+    setSavingNetPay(true);
+    try {
+      if (netPayBillId) {
+        await fetch(`/api/poultry/bills/${netPayBillId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+          body: JSON.stringify({ net_pay: amount }),
+        });
+      } else if (flockFilter) {
+        const r = await fetch('/api/poultry/bills', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+          body: JSON.stringify({ flock_id: flockFilter, net_pay: amount }),
+        });
+        const j = await r.json();
+        setNetPayBillId(j.data?.id ?? null);
+      }
+      setNetPay(amount);
+    } finally {
+      setSavingNetPay(false);
+    }
   }
 
   function onSave(row) {
@@ -439,9 +485,29 @@ export default function PoultryExpensesPage() {
         {/* Net Pay from bills */}
         <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-300 dark:border-emerald-700 p-4"
           style={{ borderLeftWidth: 3, borderLeftColor: '#059669' }}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Net Pay (Company)</p>
-          <p className="mt-1 text-lg font-bold text-emerald-700 dark:text-emerald-300">{fmt(netPay)}</p>
-          <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">from RC bills</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Net Pay (Company)</p>
+            {!editingNetPay && (
+              <button onClick={startEditNetPay} title="Edit Net Pay"
+                className="p-0.5 rounded text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
+                <Pencil size={11} />
+              </button>
+            )}
+          </div>
+          {editingNetPay ? (
+            <input
+              type="number"
+              autoFocus
+              value={netPayDraft}
+              onChange={e => setNetPayDraft(e.target.value)}
+              onBlur={saveNetPay}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditingNetPay(false); }}
+              className="mt-1 w-full text-lg font-bold text-emerald-700 dark:text-emerald-300 bg-white dark:bg-gray-900 border border-emerald-400 dark:border-emerald-600 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          ) : (
+            <p className="mt-1 text-lg font-bold text-emerald-700 dark:text-emerald-300">{fmt(netPay)}</p>
+          )}
+          <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">{savingNetPay ? 'Saving…' : 'from RC bills'}</p>
         </div>
         {/* Pottu Sold, Feed Bags Sold — always show */}
         {INCOME_CATEGORIES.map(cat => {

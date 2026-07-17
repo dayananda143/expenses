@@ -351,6 +351,7 @@ router.post('/expenses/import', excelUpload.single('file'), (req, res, next) => 
     const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const [labelRow, headerRow] = rows;
     const dataRows = rows.slice(2); // skip 2 header rows
 
     function parseDate(val) {
@@ -375,13 +376,27 @@ router.post('/expenses/import', excelUpload.single('file'), (req, res, next) => 
     }
     function str(val) { return val ? String(val).trim() : ''; }
 
-    // Column layout: [dateCol, itemCol, amtCol, notesCol, paidCol]
-    const SECTIONS = [
-      { name: 'shed',         dateCol: 0,  itemCol: 1,  amtCol: 2,  notesCol: 3,  paidCol: 4  },
-      { name: 'shed_labor',   dateCol: 6,  itemCol: 7,  amtCol: 8,  notesCol: 10, paidCol: 11 },
-      { name: 'sanjay_labor', dateCol: 13, itemCol: 14, amtCol: 15, notesCol: 16, paidCol: 17 },
-      { name: 'medicine',     dateCol: 19, itemCol: 20, amtCol: 21, notesCol: 22, paidCol: 23 },
-    ];
+    // The 4 sections (shed / shed labor / sanjay labor / medicines) don't sit at fixed
+    // column offsets — different batch exports insert varying numbers of spacer columns
+    // between them. Instead, detect each section's columns from the header rows:
+    // "Date" cells in the sub-header row mark each section's start (item/expense follow
+    // immediately after), and "Who paid" cells in the label row mark the paid-by column.
+    // Any columns between expense and paid-by are treated as free-text notes.
+    const SECTION_NAMES = ['shed', 'shed_labor', 'sanjay_labor', 'medicine'];
+    const dateCols  = headerRow.reduce((acc, v, i) => (str(v).toLowerCase() === 'date' ? [...acc, i] : acc), []);
+    const paidCols  = labelRow.reduce((acc, v, i) => (str(v).toLowerCase() === 'who paid' ? [...acc, i] : acc), []);
+    if (dateCols.length !== paidCols.length || dateCols.length < SECTION_NAMES.length) {
+      return res.status(400).json({ error: 'Could not detect expense section columns in this sheet' });
+    }
+    const SECTIONS = SECTION_NAMES.map((name, i) => {
+      const dateCol = dateCols[i];
+      const itemCol = dateCol + 1;
+      const amtCol  = dateCol + 2;
+      const paidCol = paidCols[i];
+      const notesCols = [];
+      for (let c = amtCol + 1; c < paidCol; c++) notesCols.push(c);
+      return { name, dateCol, itemCol, amtCol, notesCols, paidCol };
+    });
 
     const lastDate = {};
     const stmt = db.prepare(
@@ -398,7 +413,7 @@ router.post('/expenses/import', excelUpload.single('file'), (req, res, next) => 
           const amount = parseAmt(row[sec.amtCol]);
           if (!amount || !lastDate[sec.name]) continue;
           const item = str(row[sec.itemCol]);
-          const notes = str(row[sec.notesCol]);
+          const notes = sec.notesCols.map(c => str(row[c])).filter(Boolean).join(' | ');
           stmt.run(
             req.user.id,
             flock_id ? parseInt(flock_id) : null,

@@ -88,6 +88,7 @@ export default function App() {
           <Route path="credit-cards" element={<CreditCardsPage />} />
           <Route path="payments"      element={<PaymentsPage />} />
           <Route path="car-finance"  element={<CarFinancePage />} />
+          <Route path="salary"       element={<SalaryPage />} />
         </Route>
 
         <Route element={<WorkspaceRoute />}>

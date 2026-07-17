@@ -90,9 +90,9 @@ router.get('/', (req, res, next) => {
       params.push(String(year));
     }
     if (search) {
-      where += ' AND (h.description LIKE ? OR h.hospital LIKE ? OR h.notes LIKE ?)';
+      where += ' AND (h.description LIKE ? OR h.hospital LIKE ? OR h.notes LIKE ? OR CAST(h.amount AS TEXT) LIKE ?)';
       const s = `%${search}%`;
-      params.push(s, s, s);
+      params.push(s, s, s, s);
     }
 
     const total = db.prepare(`SELECT COUNT(*) AS n FROM hospital_expenses h WHERE ${where}`).get(...params).n;
@@ -311,9 +311,9 @@ router.get('/export/csv', (req, res, next) => {
     }
 
     if (search) {
-      where += ' AND (h.description LIKE ? OR h.hospital LIKE ? OR h.notes LIKE ?)';
+      where += ' AND (h.description LIKE ? OR h.hospital LIKE ? OR h.notes LIKE ? OR CAST(h.amount AS TEXT) LIKE ?)';
       const s = `%${search}%`;
-      params.push(s, s, s);
+      params.push(s, s, s, s);
     }
 
     const rows = db.prepare(
