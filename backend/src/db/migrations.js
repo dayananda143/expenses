@@ -596,6 +596,14 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_poultry_stake_user ON poultry_stake(user_id);
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS poultry_sanjay_salary (
+      flock_id   INTEGER PRIMARY KEY REFERENCES poultry_flock(id) ON DELETE CASCADE,
+      amount     REAL NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   // Loans
   db.exec(`
     CREATE TABLE IF NOT EXISTS loans (

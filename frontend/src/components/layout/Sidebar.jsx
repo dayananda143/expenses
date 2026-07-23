@@ -98,6 +98,10 @@ export default function Sidebar({ onClose }) {
               <ShoppingCart size={16} />
               Expenses
             </NavLink>
+            <NavLink to="/poultry/sanjay-labor" className={linkClass} onClick={onClose}>
+              <Users size={16} />
+              Sanjay Labor
+            </NavLink>
             <NavLink to="/poultry/insights" className={linkClass} onClick={onClose}>
               <BarChart2 size={16} />
               Insights

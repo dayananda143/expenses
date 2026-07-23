@@ -33,6 +33,7 @@ import PoultryPage from './pages/PoultryPage';
 import PoultryFlockPage from './pages/PoultryFlockPage';
 import PoultryMortalityPage from './pages/PoultryMortalityPage';
 import PoultryExpensesPage from './pages/PoultryExpensesPage';
+import PoultrySanjayLaborPage from './pages/PoultrySanjayLaborPage';
 import PoultrySalesPage from './pages/PoultrySalesPage';
 import PoultryInsightsPage from './pages/PoultryInsightsPage';
 import PoultryStakePage from './pages/PoultryStakePage';
@@ -115,6 +116,7 @@ export default function App() {
             <Route path="poultry/flock" element={<PoultryFlockPage />} />
             <Route path="poultry/mortality" element={<PoultryMortalityPage />} />
             <Route path="poultry/expenses" element={<PoultryExpensesPage />} />
+            <Route path="poultry/sanjay-labor" element={<PoultrySanjayLaborPage />} />
             <Route path="poultry/sales" element={<PoultrySalesPage />} />
             <Route path="poultry/insights" element={<PoultryInsightsPage />} />
             <Route path="poultry/stake" element={<PoultryStakePage />} />

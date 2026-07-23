@@ -195,7 +195,7 @@ function parseBillText(rawText) {
 
 router.get('/flock', (req, res, next) => {
   try {
-    const rows = db.prepare('SELECT * FROM poultry_flock WHERE user_id = ? ORDER BY date_added DESC').all(req.user.id);
+    const rows = db.prepare('SELECT * FROM poultry_flock ORDER BY date_added DESC').all();
     res.json({ data: rows });
   } catch (err) { next(err); }
 });
@@ -212,7 +212,7 @@ router.post('/flock', (req, res, next) => {
 
 router.patch('/flock/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_flock WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_flock WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const { name, bird_type, count, date_added, end_date, notes, status } = req.body;
     db.prepare(
@@ -233,7 +233,7 @@ router.patch('/flock/:id', (req, res, next) => {
 
 router.delete('/flock/:id', (req, res, next) => {
   try {
-    db.prepare('DELETE FROM poultry_flock WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    db.prepare('DELETE FROM poultry_flock WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -243,8 +243,8 @@ router.delete('/flock/:id', (req, res, next) => {
 router.get('/mortality', (req, res, next) => {
   try {
     const { from, to } = req.query;
-    let q = 'SELECT m.*, f.name as flock_name FROM poultry_mortality m LEFT JOIN poultry_flock f ON f.id = m.flock_id WHERE m.user_id = ?';
-    const params = [req.user.id];
+    let q = 'SELECT m.*, f.name as flock_name FROM poultry_mortality m LEFT JOIN poultry_flock f ON f.id = m.flock_id WHERE 1=1';
+    const params = [];
     if (from) { q += ' AND m.date >= ?'; params.push(from); }
     if (to)   { q += ' AND m.date <= ?'; params.push(to); }
     q += ' ORDER BY m.date DESC, m.id DESC';
@@ -265,7 +265,7 @@ router.post('/mortality', (req, res, next) => {
 
 router.patch('/mortality/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_mortality WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_mortality WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const { flock_id, date, count, cause, notes } = req.body;
     db.prepare('UPDATE poultry_mortality SET flock_id=?, date=?, count=?, cause=?, notes=? WHERE id=?').run(
@@ -283,7 +283,7 @@ router.patch('/mortality/:id', (req, res, next) => {
 
 router.delete('/mortality/:id', (req, res, next) => {
   try {
-    db.prepare('DELETE FROM poultry_mortality WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    db.prepare('DELETE FROM poultry_mortality WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -293,8 +293,8 @@ router.delete('/mortality/:id', (req, res, next) => {
 router.get('/expenses', (req, res, next) => {
   try {
     const { from, to, flock_id } = req.query;
-    let q = 'SELECT * FROM poultry_expenses WHERE user_id = ?';
-    const params = [req.user.id];
+    let q = 'SELECT * FROM poultry_expenses WHERE 1=1';
+    const params = [];
     if (from) { q += ' AND date >= ?'; params.push(from); }
     if (to)   { q += ' AND date <= ?'; params.push(to); }
     if (flock_id) { q += ' AND flock_id = ?'; params.push(flock_id); }
@@ -315,7 +315,7 @@ router.post('/expenses', (req, res, next) => {
 
 router.patch('/expenses/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_expenses WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_expenses WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const { date, category, subcategory, description, amount, notes } = req.body;
     db.prepare('UPDATE poultry_expenses SET date=?, category=?, subcategory=?, description=?, amount=?, notes=? WHERE id=?').run(
@@ -333,7 +333,7 @@ router.patch('/expenses/:id', (req, res, next) => {
 
 router.delete('/expenses/:id', (req, res, next) => {
   try {
-    db.prepare('DELETE FROM poultry_expenses WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    db.prepare('DELETE FROM poultry_expenses WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -443,8 +443,8 @@ router.post('/expenses/import', excelUpload.single('file'), (req, res, next) => 
 router.get('/sales', (req, res, next) => {
   try {
     const { from, to } = req.query;
-    let q = 'SELECT * FROM poultry_sales WHERE user_id = ?';
-    const params = [req.user.id];
+    let q = 'SELECT * FROM poultry_sales WHERE 1=1';
+    const params = [];
     if (from) { q += ' AND date >= ?'; params.push(from); }
     if (to)   { q += ' AND date <= ?'; params.push(to); }
     q += ' ORDER BY date DESC, id DESC';
@@ -464,7 +464,7 @@ router.post('/sales', (req, res, next) => {
 
 router.patch('/sales/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_sales WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_sales WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const { date, sale_type, quantity, unit, price, total, buyer, notes } = req.body;
     db.prepare('UPDATE poultry_sales SET date=?, sale_type=?, quantity=?, unit=?, price=?, total=?, buyer=?, notes=? WHERE id=?').run(
@@ -484,7 +484,7 @@ router.patch('/sales/:id', (req, res, next) => {
 
 router.delete('/sales/:id', (req, res, next) => {
   try {
-    db.prepare('DELETE FROM poultry_sales WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    db.prepare('DELETE FROM poultry_sales WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -494,23 +494,22 @@ router.delete('/sales/:id', (req, res, next) => {
 // GET /api/poultry/expenses/batch-summary — total + by-category + revenue per batch
 router.get('/expenses/batch-summary', (req, res, next) => {
   try {
-    const uid = req.user.id;
-    const batches = db.prepare('SELECT id, name, date_added, end_date FROM poultry_flock WHERE user_id = ? ORDER BY date_added DESC').all(uid);
+    const batches = db.prepare('SELECT id, name, date_added, end_date FROM poultry_flock ORDER BY date_added DESC').all();
     const INCOME_CATS = ['pottu_sold', 'feed_bags_sold'];
     const incomePlaceholders = INCOME_CATS.map(() => '?').join(',');
     const result = batches.map(b => {
       const expenses = db.prepare(
-        `SELECT COALESCE(SUM(amount),0) as total FROM poultry_expenses WHERE user_id = ? AND flock_id = ? AND category NOT IN (${incomePlaceholders})`
-      ).get(uid, b.id, ...INCOME_CATS).total;
+        `SELECT COALESCE(SUM(amount),0) as total FROM poultry_expenses WHERE flock_id = ? AND category NOT IN (${incomePlaceholders})`
+      ).get(b.id, ...INCOME_CATS).total;
       const cats = db.prepare(
-        `SELECT category, COALESCE(SUM(amount),0) as total FROM poultry_expenses WHERE user_id = ? AND flock_id = ? AND category NOT IN (${incomePlaceholders}) GROUP BY category`
-      ).all(uid, b.id, ...INCOME_CATS);
+        `SELECT category, COALESCE(SUM(amount),0) as total FROM poultry_expenses WHERE flock_id = ? AND category NOT IN (${incomePlaceholders}) GROUP BY category`
+      ).all(b.id, ...INCOME_CATS);
       const billRevenue = db.prepare(
-        'SELECT COALESCE(SUM(net_pay),0) as total FROM poultry_bills WHERE user_id = ? AND flock_id = ?'
-      ).get(uid, b.id).total;
+        'SELECT COALESCE(SUM(net_pay),0) as total FROM poultry_bills WHERE flock_id = ?'
+      ).get(b.id).total;
       const incomeRevenue = db.prepare(
-        `SELECT COALESCE(SUM(amount),0) as total FROM poultry_expenses WHERE user_id = ? AND flock_id = ? AND category IN (${incomePlaceholders})`
-      ).get(uid, b.id, ...INCOME_CATS).total;
+        `SELECT COALESCE(SUM(amount),0) as total FROM poultry_expenses WHERE flock_id = ? AND category IN (${incomePlaceholders})`
+      ).get(b.id, ...INCOME_CATS).total;
       const revenue = billRevenue + incomeRevenue;
       const profit = revenue - expenses;
       return { flock_id: b.id, name: b.name, date_added: b.date_added, end_date: b.end_date, total: expenses, by_category: cats, revenue, profit };
@@ -521,30 +520,28 @@ router.get('/expenses/batch-summary', (req, res, next) => {
 
 router.get('/summary', (req, res, next) => {
   try {
-    const uid = req.user.id;
-
     // Active batches with their death counts
     const activeBatches = db.prepare(
-      "SELECT f.*, COALESCE((SELECT SUM(count) FROM poultry_mortality m WHERE m.flock_id = f.id AND m.user_id = ?), 0) as deaths FROM poultry_flock f WHERE f.user_id = ? AND f.status = 'active' ORDER BY f.date_added DESC"
-    ).all(uid, uid);
+      "SELECT f.*, COALESCE((SELECT SUM(count) FROM poultry_mortality m WHERE m.flock_id = f.id), 0) as deaths FROM poultry_flock f WHERE f.status = 'active' ORDER BY f.date_added DESC"
+    ).all();
 
     const totalBirds = activeBatches.reduce((s, b) => s + Math.max(0, b.count - b.deaths), 0);
 
     const deathsThisMonth = db.prepare(
-      "SELECT COALESCE(SUM(count), 0) as total FROM poultry_mortality WHERE user_id = ? AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')"
-    ).get(uid).total;
+      "SELECT COALESCE(SUM(count), 0) as total FROM poultry_mortality WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now')"
+    ).get().total;
 
     const expensesThisMonth = db.prepare(
-      "SELECT COALESCE(SUM(amount), 0) as total FROM poultry_expenses WHERE user_id = ? AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')"
-    ).get(uid).total;
+      "SELECT COALESCE(SUM(amount), 0) as total FROM poultry_expenses WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now')"
+    ).get().total;
 
     const salesThisMonth = db.prepare(
-      "SELECT COALESCE(SUM(total), 0) as total FROM poultry_sales WHERE user_id = ? AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')"
-    ).get(uid).total;
+      "SELECT COALESCE(SUM(total), 0) as total FROM poultry_sales WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now')"
+    ).get().total;
 
     const recentMortality = db.prepare(
-      "SELECT date, SUM(count) as count FROM poultry_mortality WHERE user_id = ? GROUP BY date ORDER BY date DESC LIMIT 7"
-    ).all(uid);
+      "SELECT date, SUM(count) as count FROM poultry_mortality GROUP BY date ORDER BY date DESC LIMIT 7"
+    ).all();
 
     res.json({
       data: {
@@ -608,7 +605,7 @@ router.post('/bills', (req, res, next) => {
 // PATCH /api/poultry/bills/:id — update bill fields
 router.patch('/bills/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_bills WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_bills WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const allowed = [
       'voucher_no','bill_date','hatch_date','farmer_name','chick_housed','mean_age','day_gain',
@@ -632,8 +629,8 @@ router.patch('/bills/:id', (req, res, next) => {
 router.get('/bills', (req, res, next) => {
   try {
     const { flock_id } = req.query;
-    let q = 'SELECT * FROM poultry_bills WHERE user_id = ?';
-    const params = [req.user.id];
+    let q = 'SELECT * FROM poultry_bills WHERE 1=1';
+    const params = [];
     if (flock_id) { q += ' AND flock_id = ?'; params.push(flock_id); }
     q += ' ORDER BY created_at DESC';
     res.json({ data: db.prepare(q).all(...params) });
@@ -644,8 +641,8 @@ router.get('/bills', (req, res, next) => {
 router.get('/bills/all', (req, res, next) => {
   try {
     const rows = db.prepare(
-      'SELECT b.*, f.name as batch_name FROM poultry_bills b JOIN poultry_flock f ON f.id = b.flock_id WHERE b.user_id = ? ORDER BY b.bill_date DESC, b.created_at DESC'
-    ).all(req.user.id);
+      'SELECT b.*, f.name as batch_name FROM poultry_bills b JOIN poultry_flock f ON f.id = b.flock_id ORDER BY b.bill_date DESC, b.created_at DESC'
+    ).all();
     res.json({ data: rows });
   } catch (err) { next(err); }
 });
@@ -653,7 +650,7 @@ router.get('/bills/all', (req, res, next) => {
 // DELETE /api/poultry/bills/:id
 router.delete('/bills/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_bills WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_bills WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     if (row.image_path) {
       const fullPath = path.join(__dirname, '../../uploads', row.image_path);
@@ -665,9 +662,11 @@ router.delete('/bills/:id', (req, res, next) => {
 });
 
 // GET /api/poultry/farm-assets
+// Farm assets are a single shared record for the whole farm, not per-user —
+// grab whichever row exists regardless of who last saved it.
 router.get('/farm-assets', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_farm_assets WHERE user_id = ?').get(req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_farm_assets ORDER BY updated_at DESC LIMIT 1').get();
     res.json({ data: row ?? { land_value: 0, shed_value: 0, notes: null } });
   } catch (err) { next(err); }
 });
@@ -676,12 +675,17 @@ router.get('/farm-assets', (req, res, next) => {
 router.put('/farm-assets', (req, res, next) => {
   try {
     const { land_value, shed_value, acres, notes } = req.body;
-    db.prepare(`
-      INSERT INTO poultry_farm_assets (user_id, land_value, shed_value, acres, notes, updated_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(user_id) DO UPDATE SET land_value=excluded.land_value, shed_value=excluded.shed_value, acres=excluded.acres, notes=excluded.notes, updated_at=excluded.updated_at
-    `).run(req.user.id, land_value ?? 0, shed_value ?? 0, acres ?? 0, notes ?? null);
-    const row = db.prepare('SELECT * FROM poultry_farm_assets WHERE user_id = ?').get(req.user.id);
+    const existing = db.prepare('SELECT id FROM poultry_farm_assets ORDER BY updated_at DESC LIMIT 1').get();
+    if (existing) {
+      db.prepare(
+        `UPDATE poultry_farm_assets SET land_value=?, shed_value=?, acres=?, notes=?, updated_at=datetime('now') WHERE id=?`
+      ).run(land_value ?? 0, shed_value ?? 0, acres ?? 0, notes ?? null, existing.id);
+    } else {
+      db.prepare(
+        `INSERT INTO poultry_farm_assets (user_id, land_value, shed_value, acres, notes, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`
+      ).run(req.user.id, land_value ?? 0, shed_value ?? 0, acres ?? 0, notes ?? null);
+    }
+    const row = db.prepare('SELECT * FROM poultry_farm_assets ORDER BY updated_at DESC LIMIT 1').get();
     res.json({ data: row });
   } catch (err) { next(err); }
 });
@@ -689,7 +693,7 @@ router.put('/farm-assets', (req, res, next) => {
 // GET /api/poultry/stake
 router.get('/stake', (req, res, next) => {
   try {
-    const rows = db.prepare('SELECT * FROM poultry_stake WHERE user_id = ? ORDER BY percentage DESC').all(req.user.id);
+    const rows = db.prepare('SELECT * FROM poultry_stake ORDER BY percentage DESC').all();
     res.json({ data: rows });
   } catch (err) { next(err); }
 });
@@ -708,7 +712,7 @@ router.post('/stake', (req, res, next) => {
 // PATCH /api/poultry/stake/:id
 router.patch('/stake/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_stake WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_stake WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const { name, percentage, invested, notes } = req.body;
     db.prepare('UPDATE poultry_stake SET name=?, percentage=?, invested=?, notes=? WHERE id=?').run(
@@ -725,10 +729,39 @@ router.patch('/stake/:id', (req, res, next) => {
 // DELETE /api/poultry/stake/:id
 router.delete('/stake/:id', (req, res, next) => {
   try {
-    const row = db.prepare('SELECT * FROM poultry_stake WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+    const row = db.prepare('SELECT * FROM poultry_stake WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     db.prepare('DELETE FROM poultry_stake WHERE id = ?').run(row.id);
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ── Sanjay's salary (per batch) ───────────────────────────────────────────────
+
+// GET /api/poultry/sanjay-salary?flock_id= — amount for one batch, or all batches if omitted
+router.get('/sanjay-salary', (req, res, next) => {
+  try {
+    const { flock_id } = req.query;
+    if (flock_id) {
+      const row = db.prepare('SELECT * FROM poultry_sanjay_salary WHERE flock_id = ?').get(flock_id);
+      res.json({ data: row ?? { flock_id: Number(flock_id), amount: 0 } });
+    } else {
+      res.json({ data: db.prepare('SELECT * FROM poultry_sanjay_salary').all() });
+    }
+  } catch (err) { next(err); }
+});
+
+// PUT /api/poultry/sanjay-salary — upsert amount for a batch
+router.put('/sanjay-salary', (req, res, next) => {
+  try {
+    const { flock_id, amount } = req.body;
+    if (!flock_id) return res.status(400).json({ error: 'flock_id is required' });
+    db.prepare(`
+      INSERT INTO poultry_sanjay_salary (flock_id, amount, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(flock_id) DO UPDATE SET amount=excluded.amount, updated_at=excluded.updated_at
+    `).run(flock_id, amount ?? 0);
+    res.json({ data: db.prepare('SELECT * FROM poultry_sanjay_salary WHERE flock_id = ?').get(flock_id) });
   } catch (err) { next(err); }
 });
 
