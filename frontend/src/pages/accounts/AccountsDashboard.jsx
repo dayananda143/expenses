@@ -336,27 +336,42 @@ function AccountsBreakdown({ savings, credits }) {
   );
 }
 
+const is401k = (a) => /401k|principal/i.test(a.name ?? '');
+
 function UserStatSection({ label, accts }) {
-  const savings = accts.filter((a) => a.type === 'savings');
+  const allSavings = accts.filter((a) => a.type === 'savings');
+  const savings401k = allSavings.filter(is401k);
+  const savings = allSavings.filter((a) => !is401k(a));
   const credits = accts.filter((a) => a.type === 'credit');
   const totalSavings     = savings.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const total401k        = savings401k.reduce((s, a) => s + (a.balance ?? 0), 0);
   const totalOutstanding = credits.reduce((s, a) => s + (a.balance ?? 0), 0);
   const totalCreditLimit = credits.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
   const totalAvailable   = totalCreditLimit - totalOutstanding;
   const netWorth         = totalSavings - totalOutstanding;
+  const netWorthWith401k = totalSavings + total401k - totalOutstanding;
 
   return (
     <div>
       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{label}</p>
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
         <StatCard
           icon={TrendingUp}
           iconBg={netWorth >= 0 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-red-100 dark:bg-red-900/30'}
           iconColor={netWorth >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}
           label="Net Worth"
           value={fmtUSD(netWorth)}
-          sub={netWorth >= 0 ? 'savings exceed debt' : 'debt exceeds savings'}
+          sub={netWorth >= 0 ? 'excl. 401k' : 'debt exceeds savings'}
           subColor={netWorth >= 0 ? 'text-blue-500' : 'text-red-400'}
+        />
+        <StatCard
+          icon={TrendingUp}
+          iconBg={netWorthWith401k >= 0 ? 'bg-cyan-100 dark:bg-cyan-900/30' : 'bg-red-100 dark:bg-red-900/30'}
+          iconColor={netWorthWith401k >= 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-red-500'}
+          label="Net Worth (+401k)"
+          value={fmtUSD(netWorthWith401k)}
+          sub={netWorthWith401k >= 0 ? 'incl. 401k' : 'debt exceeds savings'}
+          subColor={netWorthWith401k >= 0 ? 'text-cyan-500' : 'text-red-400'}
         />
         <StatCard
           icon={PiggyBank}
@@ -365,6 +380,14 @@ function UserStatSection({ label, accts }) {
           label="Total Savings"
           value={fmtUSD(totalSavings)}
           sub={`${savings.length} account${savings.length !== 1 ? 's' : ''}`}
+        />
+        <StatCard
+          icon={PiggyBank}
+          iconBg="bg-indigo-100 dark:bg-indigo-900/30"
+          iconColor="text-indigo-600 dark:text-indigo-400"
+          label="401k Balance"
+          value={fmtUSD(total401k)}
+          sub={`${savings401k.length} account${savings401k.length !== 1 ? 's' : ''}`}
         />
         <StatCard
           icon={CreditCard}
