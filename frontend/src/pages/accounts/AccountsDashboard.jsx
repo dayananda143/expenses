@@ -296,7 +296,9 @@ function AccountsBreakdown({ savings, credits }) {
                       </div>
                     ) : undefined} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+                        {a.name}{a.belongs_to_username && <span className="text-gray-400 font-normal"> · {a.belongs_to_username}</span>}
+                      </p>
                       {pct !== null && (
                         <div className="flex items-center gap-2 mt-1">
                           <div className="flex-1 h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -511,7 +513,9 @@ export default function AccountsDashboard() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <BankLogo name={a.name} sizeClass="w-7 h-7" />
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{a.name}</p>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {a.name}{a.belongs_to_username && <span className="text-gray-400 font-normal"> · {a.belongs_to_username}</span>}
+                        </p>
                         <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
                       </div>
                     </div>
@@ -522,7 +526,9 @@ export default function AccountsDashboard() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <BankLogo name={a.name} sizeClass="w-7 h-7" />
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{a.name}</p>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+                          {a.name}{a.belongs_to_username && <span className="text-gray-400 font-normal"> · {a.belongs_to_username}</span>}
+                        </p>
                         <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
                       </div>
                     </div>
