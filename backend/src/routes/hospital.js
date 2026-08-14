@@ -64,7 +64,7 @@ router.delete('/categories/:cid', (req, res, next) => {
 // GET /api/hospital-expenses
 router.get('/', (req, res, next) => {
   try {
-    const { month, year, search, page = 1, limit: limitQ = 25, user_id, category_id, sort, order } = req.query;
+    const { month, year, search, page = 1, limit: limitQ = 25, user_id, category_id, needs_review, sort, order } = req.query;
     const SORT_COLS = { date: 'h.date', description: 'h.description', hospital: 'h.hospital', amount: 'h.amount' };
     const sortCol   = SORT_COLS[sort] ?? 'h.date';
     const sortDir   = order === 'asc' ? 'ASC' : 'DESC';
@@ -94,6 +94,9 @@ router.get('/', (req, res, next) => {
       const s = `%${search}%`;
       params.push(s, s, s, s);
     }
+    if (needs_review === '1' || needs_review === 'true') {
+      where += ' AND h.needs_review = 1';
+    }
 
     const total = db.prepare(`SELECT COUNT(*) AS n FROM hospital_expenses h WHERE ${where}`).get(...params).n;
 
@@ -116,7 +119,7 @@ router.get('/', (req, res, next) => {
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { description, amount, date, hospital, notes, assigned_to, category_id } = req.body;
+    const { description, amount, date, hospital, notes, assigned_to, category_id, needs_review } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
@@ -131,8 +134,8 @@ router.post('/', (req, res, next) => {
     const catId = category_id ? parseInt(category_id) : null;
 
     const result = db.prepare(
-      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId);
+      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes, category_id, needs_review) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, needs_review ? 1 : 0);
 
     const row = db.prepare(
       `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color
@@ -152,7 +155,7 @@ router.put('/:id', (req, res, next) => {
     const row = db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    const { description, amount, date, hospital, notes, assigned_to, category_id } = req.body;
+    const { description, amount, date, hospital, notes, assigned_to, category_id, needs_review } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
@@ -167,8 +170,8 @@ router.put('/:id', (req, res, next) => {
     const catId = category_id ? parseInt(category_id) : null;
 
     db.prepare(
-      'UPDATE hospital_expenses SET user_id = ?, description = ?, amount = ?, date = ?, hospital = ?, notes = ?, category_id = ? WHERE id = ?'
-    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, row.id);
+      'UPDATE hospital_expenses SET user_id = ?, description = ?, amount = ?, date = ?, hospital = ?, notes = ?, category_id = ?, needs_review = ? WHERE id = ?'
+    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, needs_review ? 1 : 0, row.id);
 
     const updated = db.prepare(
       `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color

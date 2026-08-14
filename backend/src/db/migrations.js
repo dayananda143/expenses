@@ -675,6 +675,7 @@ function runMigrations(db) {
   `);
   try { db.exec("ALTER TABLE hospital_expenses ADD COLUMN category_id INTEGER DEFAULT NULL REFERENCES hospital_categories(id) ON DELETE SET NULL"); } catch {}
   try { db.exec("ALTER TABLE hospital_categories ADD COLUMN icon TEXT NOT NULL DEFAULT 'circle'"); } catch {}
+  try { db.exec("ALTER TABLE hospital_expenses ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0"); } catch {}
 
   // Uma SBI ledger
   db.exec(`

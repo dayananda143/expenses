@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload, FilterX } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload, FilterX, Flag } from 'lucide-react';
 import Papa from 'papaparse';
 import {
   useHospitalExpenses,
@@ -86,8 +86,9 @@ function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose })
           notes: expense.notes ?? '',
           assigned_to: expense.user_id ?? '',
           category_id: expense.category_id ?? '',
+          needs_review: !!expense.needs_review,
         }
-      : { date: new Date().toLocaleDateString('en-CA'), assigned_to: '', category_id: '' },
+      : { date: new Date().toLocaleDateString('en-CA'), assigned_to: '', category_id: '', needs_review: false },
   });
 
   const [showAddCat, setShowAddCat] = useState(false);
@@ -124,6 +125,7 @@ function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose })
         notes: data.notes || null,
         assigned_to: data.assigned_to ? parseInt(data.assigned_to) : undefined,
         category_id: data.category_id || null,
+        needs_review: !!data.needs_review,
       };
       if (isEdit) { await update.mutateAsync({ id: expense.id, ...payload }); toast('Expense updated'); }
       else        { await create.mutateAsync(payload); toast('Expense added'); }
@@ -243,6 +245,10 @@ function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose })
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
             <textarea {...register('notes')} rows={2} className={inputCls} placeholder="Optional notes..." />
           </div>
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <input type="checkbox" {...register('needs_review')} className="rounded border-gray-300 dark:border-gray-600 text-rose-600 focus:ring-rose-500" />
+            Flag for review
+          </label>
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="flex-1 bg-rose-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-rose-700 disabled:opacity-50 transition-colors">
@@ -268,6 +274,7 @@ export default function HospitalPage() {
   const [search, setSearch] = useState('');
   const [filterUser, setFilterUser] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [needsReview, setNeedsReview] = useState(false);
   const [page, setPage]     = useState(1);
   const [limit, setLimit]   = useState(10);
   const [sort, setSort]     = useState('date');
@@ -297,6 +304,7 @@ export default function HospitalPage() {
     order,
     user_id: isAdmin && filterUser ? filterUser : undefined,
     category_id: filterCategory || undefined,
+    needs_review: needsReview || undefined,
   });
   const { data: summary } = useHospitalSummary(year, isAdmin && filterUser ? filterUser : undefined);
   const del = useDeleteHospitalExpense();
@@ -457,9 +465,19 @@ export default function HospitalPage() {
             className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
           />
         </div>
-        {(month !== null || filterCategory !== '' || filterUser !== '' || search !== '') && (
+        <button
+          onClick={() => { setNeedsReview((v) => !v); setPage(1); }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors shrink-0 ${
+            needsReview
+              ? 'bg-rose-600 border-rose-600 text-white'
+              : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
+        >
+          <Flag size={13} /> Needs review
+        </button>
+        {(month !== null || filterCategory !== '' || filterUser !== '' || search !== '' || needsReview) && (
           <button
-            onClick={() => { setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setPage(1); }}
+            onClick={() => { setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setNeedsReview(false); setPage(1); }}
             title="Clear all filters"
             className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
           >
