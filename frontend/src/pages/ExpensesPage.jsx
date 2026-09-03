@@ -848,8 +848,8 @@ function RecurringPreviewModal({ month, year, applyRecurring, onClose, toast }) 
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.description || item.category_name || 'Expense'}</p>
-                <p className="text-xs text-gray-400">
-                  {item.date}{item.already_exists ? ' · already added this month' : ''}
+                <p className="text-xs text-gray-400 truncate">
+                  {item.date}{item.subtype ? ` · ${item.subtype}` : ''}{item.already_exists ? ' · already added this month' : ''}
                 </p>
               </div>
               <p className="text-sm font-bold text-gray-900 dark:text-white shrink-0">{fmt(item.amount)}</p>

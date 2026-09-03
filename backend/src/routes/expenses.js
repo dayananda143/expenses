@@ -180,6 +180,7 @@ router.get('/recurring-preview', (req, res, next) => {
       id: t.id,
       description: t.description,
       category_name: t.category_name,
+      subtype: t.subtype,
       amount: t.amount,
       type: t.type,
       date: computeRecurringTargetDate(t, m, y),
@@ -222,7 +223,7 @@ router.post('/apply-recurring', (req, res, next) => {
     const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}`));
 
     const insert = db.prepare(
-      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)'
+      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring, subtype) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)'
     );
 
     let created = 0;
@@ -233,7 +234,7 @@ router.post('/apply-recurring', (req, res, next) => {
         const key = `${t.description}|${t.category_id}`;
         if (existingSet.has(key)) { skipped++; continue; }
         const dateStr = computeRecurringTargetDate(t, m, y);
-        insert.run(t.user_id, t.category_id, t.amount, dateStr, t.description, t.notes, t.workspace, t.type);
+        insert.run(t.user_id, t.category_id, t.amount, dateStr, t.description, t.notes, t.workspace, t.type, t.subtype);
         created++;
       }
       db.exec('COMMIT');
