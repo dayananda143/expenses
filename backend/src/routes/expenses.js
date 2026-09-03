@@ -144,17 +144,49 @@ router.post('/import/csv', (req, res, next) => {
   }
 });
 
-// GET /api/expenses/:id?workspace=india
-router.get('/:id', (req, res, next) => {
+function computeRecurringTargetDate(template, m, y) {
+  const origDay = parseInt(template.date.split('-')[2]);
+  const lastDay = new Date(y, m, 0).getDate();
+  const day = Math.min(origDay, lastDay);
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+// GET /api/expenses/recurring-preview?workspace=india&month=&year=
+router.get('/recurring-preview', (req, res, next) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const row = db.prepare(`
-      SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
-      FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
-      WHERE e.id = ? AND e.workspace = ?
-        AND e.user_id IN (SELECT id FROM users WHERE is_admin = 1)
-    `).get(req.params.id, req.workspace);
-    if (!row) return res.status(404).json({ error: 'Expense not found' });
-    res.json({ data: row });
+    const { month, year } = req.query;
+    if (!month || !year) return res.status(400).json({ error: 'month and year are required' });
+    const m = parseInt(month);
+    const y = parseInt(year);
+    const monthStart = `${y}-${String(m).padStart(2, '0')}-01`;
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    const monthEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+
+    const templates = db.prepare(`
+      SELECT e.*, c.name AS category_name FROM expenses e
+      LEFT JOIN categories c ON e.category_id = c.id
+      WHERE e.user_id = ? AND e.workspace = ? AND e.is_recurring = 1
+      ORDER BY e.description ASC
+    `).all(req.user.id, req.workspace);
+
+    const existing = db.prepare(
+      'SELECT description, category_id FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
+    ).all(req.user.id, req.workspace, monthStart, monthEnd);
+    const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}`));
+
+    const preview = templates.map((t) => ({
+      id: t.id,
+      description: t.description,
+      category_name: t.category_name,
+      amount: t.amount,
+      type: t.type,
+      date: computeRecurringTargetDate(t, m, y),
+      already_exists: existingSet.has(`${t.description}|${t.category_id}`),
+    }));
+
+    res.json({ data: preview });
   } catch (err) {
     next(err);
   }
@@ -164,7 +196,7 @@ router.get('/:id', (req, res, next) => {
 router.post('/apply-recurring', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { month, year } = req.body;
+    const { month, year, ids } = req.body;
     if (!month || !year) return res.status(400).json({ error: 'month and year are required' });
     const m = parseInt(month);
     const y = parseInt(year);
@@ -174,10 +206,12 @@ router.post('/apply-recurring', (req, res, next) => {
     const nextY = m === 12 ? y + 1 : y;
     const monthEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
 
-    // Find all recurring templates for this user+workspace
-    const templates = db.prepare(
+    // Find all recurring templates for this user+workspace (optionally limited to specific ids)
+    const idSet = Array.isArray(ids) && ids.length > 0 ? new Set(ids.map(Number)) : null;
+    let templates = db.prepare(
       'SELECT * FROM expenses WHERE user_id = ? AND workspace = ? AND is_recurring = 1'
     ).all(req.user.id, req.workspace);
+    if (idSet) templates = templates.filter((t) => idSet.has(t.id));
 
     if (templates.length === 0) return res.json({ created: 0, skipped: 0 });
 
@@ -193,22 +227,38 @@ router.post('/apply-recurring', (req, res, next) => {
 
     let created = 0;
     let skipped = 0;
-    const insertMany = db.transaction(() => {
+    db.exec('BEGIN');
+    try {
       for (const t of templates) {
         const key = `${t.description}|${t.category_id}`;
         if (existingSet.has(key)) { skipped++; continue; }
-        // Use same day-of-month from original, capped to last day of target month
-        const origDay = parseInt(t.date.split('-')[2]);
-        const lastDay = new Date(y, m, 0).getDate();
-        const day = Math.min(origDay, lastDay);
-        const dateStr = `${y}-${monthPad}-${String(day).padStart(2, '0')}`;
+        const dateStr = computeRecurringTargetDate(t, m, y);
         insert.run(t.user_id, t.category_id, t.amount, dateStr, t.description, t.notes, t.workspace, t.type);
         created++;
       }
-    });
-    insertMany();
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
 
     res.json({ created, skipped });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/expenses/:id?workspace=india
+router.get('/:id', (req, res, next) => {
+  try {
+    const row = db.prepare(`
+      SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
+      FROM expenses e LEFT JOIN categories c ON e.category_id = c.id
+      WHERE e.id = ? AND e.workspace = ?
+        AND e.user_id IN (SELECT id FROM users WHERE is_admin = 1)
+    `).get(req.params.id, req.workspace);
+    if (!row) return res.status(404).json({ error: 'Expense not found' });
+    res.json({ data: row });
   } catch (err) {
     next(err);
   }

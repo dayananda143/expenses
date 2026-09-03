@@ -11,7 +11,7 @@ const ICON_MAP = {
   'paw-print': PawPrint, 'briefcase': Briefcase, 'smartphone': Smartphone, 'shirt': Shirt,
 };
 import Papa from 'papaparse';
-import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring } from '../hooks/useExpenses';
+import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useImportExpenses, useApplyRecurring, useRecurringPreview } from '../hooks/useExpenses';
 import { useCategories, useAllSubtypes, useCreateCategory, useCreateSubtype } from '../hooks/useCategories';
 import { useTrips, useAssignExpenseToTrip } from '../hooks/useTrips';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -402,6 +402,7 @@ export default function ExpensesPage() {
   const [limit, setLimit] = useState(10);
   const fileRef = useRef(null);
   const applyRecurring = useApplyRecurring();
+  const [showRecurringPreview, setShowRecurringPreview] = useState(false);
 
   const { data: tripsData } = useTrips();
   const trips = tripsData?.data ?? [];
@@ -466,14 +467,8 @@ export default function ExpensesPage() {
     setPage(1);
   }
 
-  async function handleApplyRecurring() {
-    const m = filterMode === 'month' && filterMonth ? filterMonth : now.getMonth() + 1;
-    const y = filterMode === 'month' && filterMonth ? filterYear : now.getFullYear();
-    try {
-      const result = await applyRecurring.mutateAsync({ month: m, year: y });
-      if (result.created === 0 && result.skipped > 0) toast(`All ${result.skipped} recurring expense(s) already exist for this month`);
-      else toast(`Added ${result.created} recurring expense(s)${result.skipped ? ` (${result.skipped} already existed)` : ''}`);
-    } catch (err) { toast(err?.error ?? 'Failed to apply recurring expenses', 'error'); }
+  function handleApplyRecurring() {
+    setShowRecurringPreview(true);
   }
 
   async function handleDelete() {
@@ -788,6 +783,94 @@ export default function ExpensesPage() {
           onClose={() => setAssignTarget(null)}
         />
       )}
+      {showRecurringPreview && (
+        <RecurringPreviewModal
+          month={filterMode === 'month' && filterMonth ? filterMonth : now.getMonth() + 1}
+          year={filterMode === 'month' && filterMonth ? filterYear : now.getFullYear()}
+          applyRecurring={applyRecurring}
+          onClose={() => setShowRecurringPreview(false)}
+          toast={toast}
+        />
+      )}
+    </div>
+  );
+}
+
+function RecurringPreviewModal({ month, year, applyRecurring, onClose, toast }) {
+  const { fmt } = useWorkspace();
+  const { data, isLoading } = useRecurringPreview(month, year);
+  const items = data?.data ?? [];
+  const [selected, setSelected] = useState(null); // null = not yet initialized
+
+  const pending = items.filter((i) => !i.already_exists);
+  const selectedIds = selected ?? pending.map((i) => i.id);
+
+  function toggle(id) {
+    const base = selected ?? pending.map((i) => i.id);
+    setSelected(base.includes(id) ? base.filter((x) => x !== id) : [...base, id]);
+  }
+
+  async function handleApply() {
+    try {
+      const result = await applyRecurring.mutateAsync({ month, year, ids: selectedIds });
+      if (result.created === 0 && result.skipped > 0) toast(`All selected recurring expense(s) already exist for this month`);
+      else toast(`Added ${result.created} recurring expense(s)${result.skipped ? ` (${result.skipped} already existed)` : ''}`);
+      onClose();
+    } catch (err) { toast(err?.error ?? 'Failed to apply recurring expenses', 'error'); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-lg shadow-xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Apply Recurring — {MONTHS[month - 1]} {year}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto flex-1 space-y-2">
+          {isLoading && <LoadingSpinner />}
+          {!isLoading && items.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-6">No expenses marked "Repeat monthly" yet.</p>
+          )}
+          {!isLoading && items.map((item) => (
+            <label
+              key={item.id}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${item.already_exists ? 'border-gray-100 dark:border-gray-800 opacity-50' : 'border-gray-200 dark:border-gray-700'}`}
+            >
+              <input
+                type="checkbox"
+                disabled={item.already_exists}
+                checked={item.already_exists ? false : selectedIds.includes(item.id)}
+                onChange={() => toggle(item.id)}
+                className="w-4 h-4 rounded accent-emerald-600 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.description || item.category_name || 'Expense'}</p>
+                <p className="text-xs text-gray-400">
+                  {item.date}{item.already_exists ? ' · already added this month' : ''}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-gray-900 dark:text-white shrink-0">{fmt(item.amount)}</p>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3 px-5 py-4 border-t border-gray-100 dark:border-gray-800">
+          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={applyRecurring.isPending || selectedIds.length === 0}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {applyRecurring.isPending ? 'Adding…' : `Add ${selectedIds.length} Selected`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
