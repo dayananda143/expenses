@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Trash2, Pencil, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { Trash2, Pencil, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, X, Zap, Plus, Settings2 } from 'lucide-react';
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense } from '../hooks/useExpenses';
+import { useLedgerPresets, useCreateLedgerPreset, useUpdateLedgerPreset, useDeleteLedgerPreset } from '../hooks/useLedgerPresets';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { useToast } from '../contexts/ToastContext';
@@ -35,10 +36,20 @@ export default function IndiaLedgerPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [activeType, setActiveType] = useState('debit');
+  const [quickPreset, setQuickPreset] = useState(null);
+  const [managePresets, setManagePresets] = useState(false);
+  const [presetTarget, setPresetTarget] = useState(null);
+  const [deletePresetTarget, setDeletePresetTarget] = useState(null);
 
   const create = useCreateExpense();
   const update = useUpdateExpense();
   const deleteExp = useDeleteExpense();
+
+  const { data: presetsData } = useLedgerPresets();
+  const presets = presetsData?.data ?? [];
+  const createPreset = useCreateLedgerPreset();
+  const updatePreset = useUpdateLedgerPreset();
+  const deletePreset = useDeleteLedgerPreset();
 
   const params = {
     page,
@@ -80,11 +91,102 @@ export default function IndiaLedgerPage() {
     }
   }
 
+  async function handleQuickAdd({ date, description, amount, notes }) {
+    try {
+      await create.mutateAsync({
+        description,
+        amount,
+        date,
+        type: quickPreset.type,
+        notes: notes || null,
+      });
+      toast(`${description} recorded`);
+      setQuickPreset(null);
+    } catch (err) {
+      toast(err?.error ?? 'Failed to save', 'error');
+    }
+  }
+
+  async function handleSavePreset(data) {
+    try {
+      if (presetTarget?.id) {
+        await updatePreset.mutateAsync({ id: presetTarget.id, ...data });
+        toast('Preset updated');
+      } else {
+        await createPreset.mutateAsync(data);
+        toast('Preset added');
+      }
+      setPresetTarget(null);
+    } catch (err) {
+      toast(err?.error ?? 'Failed to save preset', 'error');
+    }
+  }
+
+  async function handleDeletePreset() {
+    try {
+      await deletePreset.mutateAsync(deletePresetTarget.id);
+      toast('Preset deleted');
+      setDeletePresetTarget(null);
+    } catch (err) {
+      toast(err?.error ?? 'Failed to delete preset', 'error');
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">Ledger</h1>
         <p className="text-sm text-gray-400 mt-0.5">Track credits and debits</p>
+      </div>
+
+      {/* Quick-add presets */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Zap size={14} className="text-amber-500" />
+          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-200">Quick Add</h2>
+          <button
+            onClick={() => setManagePresets((v) => !v)}
+            className={`ml-auto p-1.5 rounded-lg transition-colors ${managePresets ? 'bg-gray-800 text-white dark:bg-gray-100 dark:text-gray-900' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+            title="Manage presets"
+          >
+            <Settings2 size={14} />
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {presets.map((p) => (
+            <div key={p.id} className="group relative">
+              <button
+                onClick={() => (managePresets ? setPresetTarget(p) : setQuickPreset(p))}
+                className={`flex items-center gap-1.5 pl-3 pr-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${p.type === 'credit' ? 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
+              >
+                {p.type === 'credit' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {p.description}
+                <span className="text-gray-400 dark:text-gray-500 font-normal">
+                  ₹{p.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </span>
+              </button>
+              {managePresets && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeletePresetTarget(p); }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-700 text-white flex items-center justify-center hover:bg-red-500"
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button
+            onClick={() => setPresetTarget({})}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-dashed border-gray-300 dark:border-gray-600 text-gray-400 hover:text-gray-600 hover:border-gray-400 dark:hover:text-gray-300 transition-colors"
+          >
+            <Plus size={12} /> New preset
+          </button>
+        </div>
+        {managePresets && presets.length > 0 && (
+          <p className="text-xs text-gray-400 mt-2">Click a preset to edit it, or the × to delete.</p>
+        )}
       </div>
 
       {/* Add entry form */}
@@ -264,6 +366,155 @@ export default function IndiaLedgerPage() {
           isSaving={update.isPending}
         />
       )}
+
+      {quickPreset && (
+        <QuickAddModal
+          preset={quickPreset}
+          today={today}
+          onClose={() => setQuickPreset(null)}
+          onConfirm={handleQuickAdd}
+          isSaving={create.isPending}
+        />
+      )}
+
+      {presetTarget && (
+        <PresetModal
+          preset={presetTarget}
+          onClose={() => setPresetTarget(null)}
+          onSave={handleSavePreset}
+          isSaving={createPreset.isPending || updatePreset.isPending}
+        />
+      )}
+
+      {deletePresetTarget && (
+        <ConfirmDialog
+          message={`Delete preset "${deletePresetTarget.description}"?`}
+          onConfirm={handleDeletePreset}
+          onCancel={() => setDeletePresetTarget(null)}
+          loading={deletePreset.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+function QuickAddModal({ preset, today, onClose, onConfirm, isSaving }) {
+  const [date, setDate] = useState(today);
+  const [description, setDescription] = useState(preset.description);
+  const [amount, setAmount] = useState(String(preset.amount));
+  const [notes, setNotes] = useState(preset.notes ?? '');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    onConfirm({ date, description: description.trim() || preset.description, amount: parseFloat(amount), notes: notes.trim() });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Quick Add</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-3">
+          <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${preset.type === 'credit' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+            {preset.type === 'credit'
+              ? <TrendingUp size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+              : <TrendingDown size={15} className="text-red-500 dark:text-red-400 shrink-0" />
+            }
+            <span className={`text-sm font-bold shrink-0 ${preset.type === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+              {preset.type === 'credit' ? '+' : '-'}₹
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              className={`flex-1 bg-transparent border-none outline-none text-sm font-bold ${preset.type === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Description</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} required className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Date</label>
+            <input type="date" autoFocus value={date} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Notes (optional)</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Add any notes for this entry" />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={isSaving} className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition-colors ${preset.type === 'credit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'}`}>
+              {isSaving ? 'Adding…' : 'Add Entry'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function PresetModal({ preset, onClose, onSave, isSaving }) {
+  const isNew = !preset.id;
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: {
+      description: preset.description ?? '',
+      amount: preset.amount ?? '',
+      type: preset.type ?? 'debit',
+      notes: preset.notes ?? '',
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">{isNew ? 'New Preset' : 'Edit Preset'}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit(onSave)} className="p-5 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Type</label>
+            <select {...register('type')} className={inputCls}>
+              <option value="debit">Debit</option>
+              <option value="credit">Credit</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Description</label>
+            <input {...register('description', { required: 'Required' })} className={inputCls} />
+            {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Amount</label>
+            <input type="number" step="0.01" min="0.01" {...register('amount', { required: 'Required', min: { value: 0.01, message: 'Must be > 0' } })} className={inputCls} />
+            {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount.message}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Notes (optional)</label>
+            <textarea {...register('notes')} rows={2} className={inputCls + ' resize-none'} />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={isSaving} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              {isSaving ? 'Saving…' : 'Save Preset'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

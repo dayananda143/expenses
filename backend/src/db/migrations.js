@@ -381,6 +381,21 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_india_list_workspace ON india_list_items(workspace);
   `);
 
+  // Ledger presets (quick-add templates for credit/debit entries)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ledger_presets (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace   TEXT NOT NULL DEFAULT 'india',
+      description TEXT NOT NULL,
+      amount      REAL NOT NULL CHECK (amount > 0),
+      type        TEXT NOT NULL DEFAULT 'debit' CHECK (type IN ('debit','credit')),
+      notes       TEXT DEFAULT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_ledger_presets_workspace ON ledger_presets(workspace);
+  `);
+
   // Account payments
   db.exec(`
     CREATE TABLE IF NOT EXISTS account_payments (
