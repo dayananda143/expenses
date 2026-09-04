@@ -19,6 +19,7 @@ export function useCreateExpense() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses', workspace] });
       qc.invalidateQueries({ queryKey: ['dashboard', workspace] });
+      qc.invalidateQueries({ queryKey: ['recurring-preview', workspace] });
     },
   });
 }
@@ -31,6 +32,7 @@ export function useUpdateExpense() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses', workspace] });
       qc.invalidateQueries({ queryKey: ['dashboard', workspace] });
+      qc.invalidateQueries({ queryKey: ['recurring-preview', workspace] });
     },
   });
 }
@@ -43,6 +45,7 @@ export function useDeleteExpense() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses', workspace] });
       qc.invalidateQueries({ queryKey: ['dashboard', workspace] });
+      qc.invalidateQueries({ queryKey: ['recurring-preview', workspace] });
     },
   });
 }
@@ -77,6 +80,7 @@ export function useImportExpenses() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses', workspace] });
       qc.invalidateQueries({ queryKey: ['dashboard', workspace] });
+      qc.invalidateQueries({ queryKey: ['recurring-preview', workspace] });
     },
   });
 }
