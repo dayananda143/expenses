@@ -172,9 +172,9 @@ router.get('/recurring-preview', (req, res, next) => {
     `).all(req.user.id, req.workspace);
 
     const existing = db.prepare(
-      'SELECT description, category_id FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
+      'SELECT description, category_id, subtype FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
     ).all(req.user.id, req.workspace, monthStart, monthEnd);
-    const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}`));
+    const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}|${e.subtype}`));
 
     const preview = templates.map((t) => ({
       id: t.id,
@@ -184,7 +184,7 @@ router.get('/recurring-preview', (req, res, next) => {
       amount: t.amount,
       type: t.type,
       date: computeRecurringTargetDate(t, m, y),
-      already_exists: existingSet.has(`${t.description}|${t.category_id}`),
+      already_exists: existingSet.has(`${t.description}|${t.category_id}|${t.subtype}`),
     }));
 
     res.json({ data: preview });
@@ -216,11 +216,11 @@ router.post('/apply-recurring', (req, res, next) => {
 
     if (templates.length === 0) return res.json({ created: 0, skipped: 0 });
 
-    // Find which are already in target month (by description+category_id to avoid dupes)
+    // Find which are already in target month (by description+category_id+subtype to avoid dupes)
     const existing = db.prepare(
-      'SELECT description, category_id FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
+      'SELECT description, category_id, subtype FROM expenses WHERE user_id = ? AND workspace = ? AND date >= ? AND date < ?'
     ).all(req.user.id, req.workspace, monthStart, monthEnd);
-    const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}`));
+    const existingSet = new Set(existing.map((e) => `${e.description}|${e.category_id}|${e.subtype}`));
 
     const insert = db.prepare(
       'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring, subtype) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)'
@@ -231,7 +231,7 @@ router.post('/apply-recurring', (req, res, next) => {
     db.exec('BEGIN');
     try {
       for (const t of templates) {
-        const key = `${t.description}|${t.category_id}`;
+        const key = `${t.description}|${t.category_id}|${t.subtype}`;
         if (existingSet.has(key)) { skipped++; continue; }
         const dateStr = computeRecurringTargetDate(t, m, y);
         insert.run(t.user_id, t.category_id, t.amount, dateStr, t.description, t.notes, t.workspace, t.type, t.subtype);
