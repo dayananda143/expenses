@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets } from 'lucide-react';
+import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets, Target } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -177,6 +177,54 @@ export function PromoBadge({ date }) {
   );
 }
 
+// ─── Goal progress ─────────────────────────────────────────────────────────
+
+export function GoalProgress({ account }) {
+  const { type, balance, goal_amount, goal_date } = account;
+  if (!goal_amount) return null;
+
+  const days = goal_date ? daysFromToday(goal_date) : null;
+
+  if (type === 'savings') {
+    const pct = Math.max(0, Math.min(100, (balance / goal_amount) * 100));
+    const reached = balance >= goal_amount;
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+            <Target size={11} className="text-emerald-500" />
+            {reached ? 'Goal reached' : `${fmtUSD(balance)} of ${fmtUSD(goal_amount)}`}
+          </span>
+          <span className="font-semibold text-gray-400">{pct.toFixed(0)}%{goal_date ? ` · ${fmtDate(goal_date)}` : ''}</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+          <div className={`h-full rounded-full ${reached ? 'bg-emerald-500' : 'bg-emerald-400'}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  }
+
+  // credit: payoff goal
+  const remaining = Math.max(0, balance - goal_amount);
+  const reached = balance <= goal_amount;
+  const months = days !== null ? Math.max(1, Math.ceil(days / 30.44)) : null;
+  const monthlyNeeded = months && remaining > 0 ? remaining / months : null;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+          <Target size={11} className="text-rose-500" />
+          {reached ? 'Payoff goal reached' : `${fmtUSD(remaining)} to reach ${fmtUSD(goal_amount)} goal`}
+        </span>
+        {goal_date && <span className="font-semibold text-gray-400">by {fmtDate(goal_date)}</span>}
+      </div>
+      {!reached && monthlyNeeded !== null && (
+        <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">Pay {fmtUSD(monthlyNeeded)}/mo to hit goal</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Account Modal ────────────────────────────────────────────────────────────
 
 const inputCls = 'w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors';
@@ -197,7 +245,8 @@ export function AccountModal({ account, defaultType, onClose }) {
       is_active: account.is_active !== 0, notes: account.notes ?? '',
       belongs_to_user_id: account.belongs_to_user_id != null ? String(account.belongs_to_user_id) : '',
       is_liquid: account.is_liquid !== 0,
-    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false },
+      goal_amount: account.goal_amount ?? '', goal_date: account.goal_date ?? '',
+    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false, goal_amount: '', goal_date: '' },
   });
   const type = watch('type');
   const name = watch('name');
@@ -218,6 +267,8 @@ export function AccountModal({ account, defaultType, onClose }) {
       is_active: data.is_active,
       belongs_to_user_id: data.belongs_to_user_id ? parseInt(data.belongs_to_user_id) : null,
       is_liquid: data.is_liquid,
+      goal_amount: data.goal_amount ? parseFloat(data.goal_amount) : null,
+      goal_date: data.goal_date || null,
     };
     if (isEdit) await update.mutateAsync({ id: account.id, ...payload });
     else await create.mutateAsync(payload);
@@ -293,6 +344,16 @@ export function AccountModal({ account, defaultType, onClose }) {
               </div>
             </>
           )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>{type === 'credit' ? 'Payoff Goal (USD)' : 'Savings Goal (USD)'}</label>
+              <input type="number" step="0.01" min="0" {...register('goal_amount')} className={inputCls} placeholder={type === 'credit' ? 'e.g. 0' : 'e.g. 10000'} />
+            </div>
+            <div>
+              <label className={labelCls}>Target Date</label>
+              <input type="date" {...register('goal_date')} className={inputCls} />
+            </div>
+          </div>
           <div>
             <label className={labelCls}>Notes</label>
             <input {...register('notes')} className={inputCls} placeholder="Optional" />
@@ -393,6 +454,7 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
               </div>
             </div>
           )}
+          {a.goal_amount ? <div className="mt-3 text-left"><GoalProgress account={a} /></div> : null}
         </div>
 
         {/* Tabs — only show for credit accounts */}
@@ -663,6 +725,7 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
               </div>
             </div>
           </div>
+          {a.goal_amount ? <div className="mt-3"><GoalProgress account={a} /></div> : null}
         </div>
       </div>
     );
@@ -778,6 +841,8 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
               Pay <span className="font-bold">{fmtUSDDecimal(minPmt)}/mo</span> to clear by promo end ({mo} mo left)
             </div>
           )}
+
+          {a.goal_amount ? <div className="mb-2"><GoalProgress account={a} /></div> : null}
 
           {a.notes && <p className="text-xs text-gray-400 italic mb-2">{a.notes}</p>}
 

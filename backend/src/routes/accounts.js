@@ -37,14 +37,14 @@ router.get('/', (req, res, next) => {
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes, belongs_to_user_id, is_liquid } = req.body;
+    const { name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes, belongs_to_user_id, is_liquid, goal_amount, goal_date } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
     if (type && !['savings', 'credit'].includes(type)) return res.status(400).json({ error: 'type must be savings or credit' });
     const adminId = getFirstAdminId();
     const maxOrder = db.prepare(`SELECT COALESCE(MAX(a.sort_order), 0) AS m FROM accounts a WHERE ${adminUserWhere} AND a.workspace = ?`).get(req.workspace).m;
     const result = db.prepare(
-      'INSERT INTO accounts (user_id, workspace, name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes, sort_order, belongs_to_user_id, is_liquid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(adminId, req.workspace, name.trim(), type ?? 'savings', parseFloat(balance ?? 0), credit_limit ? parseFloat(credit_limit) : null, due_day ? parseInt(due_day) : null, promo_apr_end_date ?? null, is_active !== false ? 1 : 0, notes ?? null, maxOrder + 1, belongs_to_user_id ? parseInt(belongs_to_user_id) : null, is_liquid ? 1 : 0);
+      'INSERT INTO accounts (user_id, workspace, name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes, sort_order, belongs_to_user_id, is_liquid, goal_amount, goal_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(adminId, req.workspace, name.trim(), type ?? 'savings', parseFloat(balance ?? 0), credit_limit ? parseFloat(credit_limit) : null, due_day ? parseInt(due_day) : null, promo_apr_end_date ?? null, is_active !== false ? 1 : 0, notes ?? null, maxOrder + 1, belongs_to_user_id ? parseInt(belongs_to_user_id) : null, is_liquid ? 1 : 0, goal_amount ? parseFloat(goal_amount) : null, goal_date ?? null);
     const row = db.prepare('SELECT a.*, u.username AS belongs_to_username FROM accounts a LEFT JOIN users u ON u.id = a.belongs_to_user_id WHERE a.id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: row });
   } catch (err) { next(err); }
@@ -68,12 +68,12 @@ router.put('/:id', (req, res, next) => {
   try {
     const account = db.prepare(`SELECT a.* FROM accounts a WHERE a.id = ? AND ${adminUserWhere} AND a.workspace = ?`).get(req.params.id, req.workspace);
     if (!account) return res.status(404).json({ error: 'Account not found' });
-    const { name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes, belongs_to_user_id, is_liquid } = req.body;
+    const { name, type, balance, credit_limit, due_day, promo_apr_end_date, is_active, notes, belongs_to_user_id, is_liquid, goal_amount, goal_date } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
     if (type && !['savings', 'credit'].includes(type)) return res.status(400).json({ error: 'type must be savings or credit' });
     db.prepare(
-      'UPDATE accounts SET name = ?, type = ?, balance = ?, credit_limit = ?, due_day = ?, promo_apr_end_date = ?, is_active = ?, notes = ?, belongs_to_user_id = ?, is_liquid = ? WHERE id = ?'
-    ).run(name.trim(), type ?? account.type, parseFloat(balance ?? 0), credit_limit ? parseFloat(credit_limit) : null, due_day ? parseInt(due_day) : null, promo_apr_end_date ?? null, is_active !== false ? 1 : 0, notes ?? null, belongs_to_user_id ? parseInt(belongs_to_user_id) : null, is_liquid ? 1 : 0, account.id);
+      'UPDATE accounts SET name = ?, type = ?, balance = ?, credit_limit = ?, due_day = ?, promo_apr_end_date = ?, is_active = ?, notes = ?, belongs_to_user_id = ?, is_liquid = ?, goal_amount = ?, goal_date = ? WHERE id = ?'
+    ).run(name.trim(), type ?? account.type, parseFloat(balance ?? 0), credit_limit ? parseFloat(credit_limit) : null, due_day ? parseInt(due_day) : null, promo_apr_end_date ?? null, is_active !== false ? 1 : 0, notes ?? null, belongs_to_user_id ? parseInt(belongs_to_user_id) : null, is_liquid ? 1 : 0, goal_amount ? parseFloat(goal_amount) : null, goal_date ?? null, account.id);
     const row = db.prepare('SELECT a.*, u.username AS belongs_to_username FROM accounts a LEFT JOIN users u ON u.id = a.belongs_to_user_id WHERE a.id = ?').get(account.id);
     res.json({ data: row });
   } catch (err) { next(err); }
