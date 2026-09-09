@@ -8,6 +8,7 @@ import AccountsShell from './pages/accounts/AccountsShell';
 import AccountsDashboard from './pages/accounts/AccountsDashboard';
 import SavingsPage from './pages/accounts/SavingsPage';
 import CreditCardsPage from './pages/accounts/CreditCardsPage';
+import ReturnsPage from './pages/accounts/ReturnsPage';
 import PaymentsPage from './pages/accounts/PaymentsPage';
 import CarFinancePage from './pages/accounts/CarFinancePage';
 import DashboardPage from './pages/DashboardPage';
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="dashboard"    element={<AccountsDashboard />} />
           <Route path="savings"      element={<SavingsPage />} />
           <Route path="credit-cards" element={<CreditCardsPage />} />
+          <Route path="returns"      element={<ReturnsPage />} />
           <Route path="payments"      element={<PaymentsPage />} />
           <Route path="car-finance"  element={<CarFinancePage />} />
           <Route path="salary"       element={<SalaryPage />} />

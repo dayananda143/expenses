@@ -414,6 +414,24 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_account_payments_user ON account_payments(user_id);
   `);
 
+  // Returns (items purchased on a credit card pending/awaiting refund)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS returns (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace   TEXT NOT NULL DEFAULT 'us',
+      account_id  INTEGER DEFAULT NULL REFERENCES accounts(id) ON DELETE SET NULL,
+      item_name   TEXT NOT NULL,
+      amount      REAL NOT NULL CHECK(amount > 0),
+      date        TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','returned')),
+      notes       TEXT DEFAULT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_returns_user ON returns(user_id);
+    CREATE INDEX IF NOT EXISTS idx_returns_workspace ON returns(workspace);
+  `);
+
   // Health & Diet
   db.exec(`
     CREATE TABLE IF NOT EXISTS health_meals (
