@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark, ScanFace, Car, DollarSign, RotateCcw } from 'lucide-react';
+import { LayoutDashboard, PiggyBank, CreditCard, Receipt, Sun, Moon, Menu, X, ArrowLeftRight, ChevronDown, KeyRound, LogOut, ShieldCheck, ShieldOff, Landmark, ScanFace, Car, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ChangePasswordModal from '../../components/auth/ChangePasswordModal';
@@ -11,7 +11,6 @@ const NAV = [
   { to: '/accounts/dashboard',     label: 'Dashboard',     Icon: LayoutDashboard },
   { to: '/accounts/savings',       label: 'Savings',        Icon: PiggyBank },
   { to: '/accounts/credit-cards',  label: 'Credit Cards',   Icon: CreditCard },
-  { to: '/accounts/returns',       label: 'Returns',        Icon: RotateCcw },
   { to: '/accounts/payments',      label: 'Payments',       Icon: Receipt },
   { to: '/accounts/car-finance',   label: 'Car Finance',    Icon: Car },
   { to: '/accounts/salary',        label: 'Salary',         Icon: DollarSign },

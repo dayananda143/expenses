@@ -88,7 +88,6 @@ export default function App() {
           <Route path="dashboard"    element={<AccountsDashboard />} />
           <Route path="savings"      element={<SavingsPage />} />
           <Route path="credit-cards" element={<CreditCardsPage />} />
-          <Route path="returns"      element={<ReturnsPage />} />
           <Route path="payments"      element={<PaymentsPage />} />
           <Route path="car-finance"  element={<CarFinancePage />} />
           <Route path="salary"       element={<SalaryPage />} />
@@ -124,6 +123,7 @@ export default function App() {
             <Route path="poultry/stake" element={<PoultryStakePage />} />
             <Route path="poultry/uma-sbi" element={<UmaSbiPage />} />
             <Route path="trips"         element={<TripsPage />} />
+            <Route path="returns"       element={<ReturnsPage />} />
             <Route path="brainstorm"    element={<BrainstormPage />} />
             <Route path="brainstorm/:id" element={<BrainstormDetailPage />} />
             <Route path="property"      element={<PropertyPage />} />

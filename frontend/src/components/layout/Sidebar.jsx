@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope, Plane, TableProperties, Sparkles, Building2 } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tag, Target, Users, HeartPulse, Wallet, X, PiggyBank, ShieldCheck, Lightbulb, ListOrdered, ShoppingBag, Droplets, Scale, Bird, TrendingUp, ShoppingCart, BarChart2, PieChart, CreditCard, Landmark, Stethoscope, Plane, TableProperties, Sparkles, Building2, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -188,6 +188,13 @@ export default function Sidebar({ onClose }) {
               <NavLink to="/salary" className={linkClass} onClick={onClose}>
                 <Wallet size={16} />
                 Salary
+              </NavLink>
+            )}
+
+            {workspace !== 'india' && (
+              <NavLink to="/returns" className={linkClass} onClick={onClose}>
+                <RotateCcw size={16} />
+                Returns
               </NavLink>
             )}
           </>
