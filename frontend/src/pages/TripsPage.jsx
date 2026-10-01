@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, MapPin, Calendar, Receipt, ChevronDown, ChevronUp, Plane, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, MapPin, Calendar, Receipt, ChevronDown, ChevronUp, Plane, PartyPopper } from 'lucide-react';
 import { useTrips, useCreateTrip, useUpdateTrip, useDeleteTrip, useTripExpenses } from '../hooks/useTrips';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ErrorMessage from '../components/shared/ErrorMessage';
@@ -17,11 +17,12 @@ function TripModal({ trip, onClose }) {
   const update = useUpdateTrip();
   const isEdit = !!trip?.id;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     defaultValues: trip
-      ? { name: trip.name, destination: trip.destination ?? '', start_date: trip.start_date ?? '', end_date: trip.end_date ?? '', notes: trip.notes ?? '' }
-      : { name: '', destination: '', start_date: '', end_date: '', notes: '' },
+      ? { name: trip.name, destination: trip.destination ?? '', start_date: trip.start_date ?? '', end_date: trip.end_date ?? '', notes: trip.notes ?? '', type: trip.type ?? 'trip' }
+      : { name: '', destination: '', start_date: '', end_date: '', notes: '', type: 'trip' },
   });
+  const type = watch('type');
 
   async function onSubmit(data) {
     try {
@@ -31,6 +32,7 @@ function TripModal({ trip, onClose }) {
         start_date: data.start_date || null,
         end_date: data.end_date || null,
         notes: data.notes?.trim() || null,
+        type: data.type === 'function' ? 'function' : 'trip',
       };
       if (isEdit) { await update.mutateAsync({ id: trip.id, ...payload }); toast('Trip updated'); }
       else        { await create.mutateAsync(payload); toast('Trip created'); }
@@ -42,12 +44,33 @@ function TripModal({ trip, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{isEdit ? 'Edit Trip' : 'New Trip'}</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{isEdit ? 'Edit' : 'New'} {type === 'function' ? 'Function' : 'Trip'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trip Name *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'trip', label: 'Trip', Icon: Plane },
+                { value: 'function', label: 'Function', Icon: PartyPopper },
+              ].map(({ value, label, Icon }) => (
+                <label
+                  key={value}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm font-medium ${
+                    type === value
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
+                      : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  <input type="radio" value={value} {...register('type')} className="sr-only" />
+                  <Icon size={14} />{label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{type === 'function' ? 'Function' : 'Trip'} Name *</label>
             <input {...register('name', { required: 'Name is required' })} className={inputCls} placeholder="e.g. NYC Weekend" />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
           </div>
@@ -187,15 +210,22 @@ export default function TripsPage() {
 
       {!isLoading && !error && trips.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {trips.map((trip) => (
+          {trips.map((trip) => {
+            const isFunction = trip.type === 'function';
+            return (
             <div key={trip.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                      <Plane size={13} className="text-emerald-600 dark:text-emerald-400" />
+                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isFunction ? 'bg-violet-100 dark:bg-violet-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'}`}>
+                      {isFunction
+                        ? <PartyPopper size={13} className="text-violet-600 dark:text-violet-400" />
+                        : <Plane size={13} className="text-emerald-600 dark:text-emerald-400" />}
                     </span>
                     <h3 className="font-semibold text-gray-900 dark:text-white truncate">{trip.name}</h3>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${isFunction ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                      {isFunction ? 'Function' : 'Trip'}
+                    </span>
                   </div>
                   {trip.destination && (
                     <div className="flex items-center gap-1 mt-1.5 ml-9">
@@ -257,7 +287,8 @@ export default function TripsPage() {
 
               {expandedId === trip.id && <TripExpenses tripId={trip.id} />}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

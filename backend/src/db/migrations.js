@@ -812,6 +812,7 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id);
   `);
   try { db.exec("ALTER TABLE expenses ADD COLUMN trip_id INTEGER DEFAULT NULL REFERENCES trips(id) ON DELETE SET NULL"); } catch {}
+  try { db.exec("ALTER TABLE trips ADD COLUMN type TEXT NOT NULL DEFAULT 'trip' CHECK(type IN ('trip','function'))"); } catch {}
 
   // Salary entries: credit/debit type, with optional linked credit card account
   try { db.exec("ALTER TABLE salary_entries ADD COLUMN entry_type TEXT NOT NULL DEFAULT 'debit'"); } catch {}

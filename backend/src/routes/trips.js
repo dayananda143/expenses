@@ -38,12 +38,13 @@ router.get('/', (req, res, next) => {
 // POST /api/trips
 router.post('/', (req, res, next) => {
   try {
-    const { name, destination, start_date, end_date, notes } = req.body;
+    const { name, destination, start_date, end_date, notes, type } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
     const adminId = getAdminId();
+    const tripType = type === 'function' ? 'function' : 'trip';
     const result = db.prepare(
-      'INSERT INTO trips (user_id, workspace, name, destination, start_date, end_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(adminId, req.workspace, name.trim(), destination?.trim() || null, start_date || null, end_date || null, notes?.trim() || null);
+      'INSERT INTO trips (user_id, workspace, name, destination, start_date, end_date, notes, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(adminId, req.workspace, name.trim(), destination?.trim() || null, start_date || null, end_date || null, notes?.trim() || null, tripType);
     res.status(201).json({ data: tripRow(result.lastInsertRowid) });
   } catch (err) { next(err); }
 });
@@ -53,10 +54,11 @@ router.put('/:id', (req, res, next) => {
   try {
     const trip = db.prepare(`SELECT * FROM trips WHERE id = ? AND ${adminUserWhere} AND workspace = ?`).get(req.params.id, req.workspace);
     if (!trip) return res.status(404).json({ error: 'Not found' });
-    const { name, destination, start_date, end_date, notes } = req.body;
+    const { name, destination, start_date, end_date, notes, type } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
-    db.prepare('UPDATE trips SET name=?, destination=?, start_date=?, end_date=?, notes=? WHERE id=?')
-      .run(name.trim(), destination?.trim() || null, start_date || null, end_date || null, notes?.trim() || null, trip.id);
+    const tripType = type === 'function' ? 'function' : 'trip';
+    db.prepare('UPDATE trips SET name=?, destination=?, start_date=?, end_date=?, notes=?, type=? WHERE id=?')
+      .run(name.trim(), destination?.trim() || null, start_date || null, end_date || null, notes?.trim() || null, tripType, trip.id);
     res.json({ data: tripRow(trip.id) });
   } catch (err) { next(err); }
 });
