@@ -180,7 +180,7 @@ export default function Sidebar({ onClose }) {
             {workspace !== 'india' && (
               <NavLink to="/trips" className={linkClass} onClick={onClose}>
                 <Plane size={16} />
-                Trips
+                Trips and Functions
               </NavLink>
             )}
 
