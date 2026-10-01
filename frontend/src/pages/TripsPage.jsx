@@ -147,7 +147,7 @@ export default function TripsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Trips</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Trips and Functions</h1>
           {!isLoading && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {trips.length} trip{trips.length !== 1 ? 's' : ''}
