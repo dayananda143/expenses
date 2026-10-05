@@ -125,6 +125,16 @@ export function fmtFullDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// Parses a SQLite `datetime('now')` string (UTC, 'YYYY-MM-DD HH:MM:SS') and
+// formats it in the viewer's local timezone as "Mon D, YYYY, h:mm AM/PM".
+export function fmtDateTime(dateStr) {
+  if (!dateStr) return null;
+  const iso = dateStr.includes('T') ? dateStr : `${dateStr.replace(' ', 'T')}Z`;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 // ─── Badges ──────────────────────────────────────────────────────────────────
 
 export function DueBadge({ day, lastPaidDate }) {
@@ -443,6 +453,7 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
             {fmtUSDDecimal(a.balance)}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">{isSavings ? 'current balance' : 'outstanding balance'}</p>
+          {a.updated_at && <p className="text-[11px] text-gray-400 mt-0.5">Updated {fmtDateTime(a.updated_at)}</p>}
           {pct !== null && (
             <div className="mt-3 space-y-1">
               <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -707,6 +718,7 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
               <div className="text-right">
                 <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">{fmtUSD(a.balance)}</p>
                 <p className="text-[11px] text-gray-400">balance</p>
+                {a.updated_at && <p className="text-[10px] text-gray-400 whitespace-nowrap">Updated {fmtDateTime(a.updated_at)}</p>}
               </div>
               <div className="flex flex-col gap-1 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 {onArchive && (

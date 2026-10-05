@@ -92,6 +92,14 @@ function runMigrations(db) {
   try { db.exec("ALTER TABLE accounts ADD COLUMN is_liquid INTEGER NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN goal_amount REAL DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN goal_date TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE accounts ADD COLUMN updated_at TEXT DEFAULT NULL"); } catch {}
+  try {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS accounts_updated_at
+      AFTER UPDATE ON accounts FOR EACH ROW
+      BEGIN UPDATE accounts SET updated_at = datetime('now') WHERE id = OLD.id; END;
+    `);
+  } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN uma_sbi_as_of_date TEXT DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE expenses ADD COLUMN type TEXT NOT NULL DEFAULT 'debit' CHECK(type IN ('debit','credit'))"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN hospital_access INTEGER NOT NULL DEFAULT 0"); } catch {}
