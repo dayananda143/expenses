@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets, Target } from 'lucide-react';
+import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets, Target, Link2 } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -256,7 +256,8 @@ export function AccountModal({ account, defaultType, onClose }) {
       belongs_to_user_id: account.belongs_to_user_id != null ? String(account.belongs_to_user_id) : '',
       is_liquid: account.is_liquid !== 0,
       goal_amount: account.goal_amount ?? '', goal_date: account.goal_date ?? '',
-    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false, goal_amount: '', goal_date: '' },
+      website_url: account.website_url ?? '',
+    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false, goal_amount: '', goal_date: '', website_url: '' },
   });
   const type = watch('type');
   const name = watch('name');
@@ -279,6 +280,7 @@ export function AccountModal({ account, defaultType, onClose }) {
       is_liquid: data.is_liquid,
       goal_amount: data.goal_amount ? parseFloat(data.goal_amount) : null,
       goal_date: data.goal_date || null,
+      website_url: data.website_url?.trim() || null,
     };
     if (isEdit) await update.mutateAsync({ id: account.id, ...payload });
     else await create.mutateAsync(payload);
@@ -363,6 +365,10 @@ export function AccountModal({ account, defaultType, onClose }) {
               <label className={labelCls}>Target Date</label>
               <input type="date" {...register('goal_date')} className={inputCls} />
             </div>
+          </div>
+          <div>
+            <label className={labelCls}>Website</label>
+            <input type="url" {...register('website_url')} className={inputCls} placeholder="https://..." />
           </div>
           <div>
             <label className={labelCls}>Notes</label>
@@ -548,6 +554,20 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
               {a.notes && (
                 <DetailRow label="Notes" value={a.notes} />
               )}
+              {a.website_url && (
+                <div className="flex items-start justify-between gap-4 py-2.5 border-b border-gray-50 dark:border-gray-800 last:border-0">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide shrink-0">Website</span>
+                  <a
+                    href={a.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold text-right text-blue-600 dark:text-blue-400 hover:underline truncate flex items-center gap-1 justify-end"
+                  >
+                    <Link2 size={12} className="shrink-0" />
+                    <span className="truncate">{a.website_url.replace(/^https?:\/\//, '')}</span>
+                  </a>
+                </div>
+              )}
               <DetailRow label="Status" value={a.is_active ? 'Active' : 'Inactive'} valueClass={a.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'} />
               <DetailRow label="Liquidity" value={a.is_liquid ? 'Liquid' : 'Non-liquid'} valueClass={a.is_liquid ? 'text-cyan-600 dark:text-cyan-400' : 'text-gray-400'} />
             </div>
@@ -693,6 +713,18 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
                 <div className="flex items-center gap-1.5">
                   <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{a.name}</p>
                   {!a.is_active && <EyeOff size={11} className="text-gray-400 shrink-0" />}
+                  {a.website_url && (
+                    <a
+                      href={a.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Open website"
+                      className="text-gray-300 dark:text-gray-700 hover:text-emerald-500 dark:hover:text-emerald-400 shrink-0"
+                    >
+                      <Link2 size={11} />
+                    </a>
+                  )}
                   {onView && <Info size={10} className="text-gray-300 dark:text-gray-700 shrink-0" />}
                 </div>
                 <div className="flex flex-wrap items-center gap-1 mt-0.5">

@@ -93,6 +93,7 @@ function runMigrations(db) {
   try { db.exec("ALTER TABLE accounts ADD COLUMN goal_amount REAL DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN goal_date TEXT DEFAULT NULL"); } catch {}
   try { db.exec("ALTER TABLE accounts ADD COLUMN updated_at TEXT DEFAULT NULL"); } catch {}
+  try { db.exec("ALTER TABLE accounts ADD COLUMN website_url TEXT DEFAULT NULL"); } catch {}
   try {
     db.exec(`
       CREATE TRIGGER IF NOT EXISTS accounts_updated_at
