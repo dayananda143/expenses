@@ -805,9 +805,23 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
           {/* Header row */}
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="min-w-0">
-              <button onClick={() => onView?.(a)} className="text-left hover:opacity-80 transition-opacity">
-                <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate">{a.name}</p>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => onView?.(a)} className="text-left hover:opacity-80 transition-opacity min-w-0">
+                  <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate">{a.name}</p>
+                </button>
+                {a.website_url && (
+                  <a
+                    href={a.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Open website"
+                    className="text-gray-300 dark:text-gray-700 hover:text-rose-500 dark:hover:text-rose-400 shrink-0"
+                  >
+                    <Link2 size={11} />
+                  </a>
+                )}
+              </div>
               {a.belongs_to_username && (
                 <span className="inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
                   {a.belongs_to_username}
