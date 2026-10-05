@@ -329,7 +329,7 @@ function AccountsStrip({ savings, credits }) {
       {list.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-8">No {tab} accounts</p>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pt-3 pb-1 -mx-0.5 px-0.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pt-3">
           {list.map((a) => {
             const isSavings = a.type === 'savings';
             const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
@@ -341,7 +341,7 @@ function AccountsStrip({ savings, credits }) {
                 onDragOver={!isTouch ? (e) => handleDragOver(e, a.id) : undefined}
                 onDrop={!isTouch ? handleDrop : undefined}
                 onClick={() => setViewAccount(a)}
-                className="shrink-0 w-[180px] text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing"
+                className="text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <BankLogo name={a.name} sizeClass="w-8 h-8" fallback={isSavings ? (
