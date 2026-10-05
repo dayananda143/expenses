@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { TrendingUp, CreditCard, PiggyBank, AlertCircle, Calendar, X, GripVertical, Car } from 'lucide-react';
+import { TrendingUp, TrendingDown, CreditCard, PiggyBank, AlertCircle, Calendar, X, Car, Landmark } from 'lucide-react';
 import { useAccounts, useReorderAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -187,25 +187,88 @@ function CarFinancePaymentModal({ onClose }) {
   );
 }
 
-function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }) {
+function StatTile({ icon: Icon, iconBg, iconColor, label, value, sub }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 flex items-start gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-        <Icon size={20} className={iconColor} />
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-1.5">
+      <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconBg}`}>
+        <Icon size={15} className={iconColor} />
+      </span>
+      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">{label}</span>
+      <span className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">{value}</span>
+      {sub && <span className="text-xs text-gray-400">{sub}</span>}
+    </div>
+  );
+}
+
+const is401k = (a) => /401k|principal/i.test(a.name ?? '');
+
+// Net worth hero: big figure + a savings/debt split donut
+function NetWorthHero({ accts }) {
+  const savings = accts.filter((a) => a.type === 'savings');
+  const credits = accts.filter((a) => a.type === 'credit');
+  const totalSavingsAll  = savings.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const totalOutstanding = credits.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const netWorth = totalSavingsAll - totalOutstanding;
+
+  const total = totalSavingsAll + totalOutstanding;
+  const savingsPct = total > 0 ? (totalSavingsAll / total) * 100 : 100;
+  const debtPct = 100 - savingsPct;
+  const circumference = 2 * Math.PI * 38;
+  const savingsLen = (savingsPct / 100) * circumference;
+  const debtLen = (debtPct / 100) * circumference;
+
+  const positive = netWorth >= 0;
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-[20px] border border-gray-200 dark:border-gray-800 shadow-sm p-6 sm:p-7 grid grid-cols-1 sm:grid-cols-[1.1fr_auto] gap-6 items-center">
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Net worth</p>
+        <p className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+          {fmtUSD(netWorth)}
+        </p>
+        <p className="mt-2.5 text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-3">
+          <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${positive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+            {positive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {positive ? 'Savings exceed debt' : 'Debt exceeds savings'}
+          </span>
+          <span><b className="text-gray-700 dark:text-gray-200 font-semibold">{fmtUSD(totalSavingsAll)}</b> saved · <b className="text-gray-700 dark:text-gray-200 font-semibold">{fmtUSD(totalOutstanding)}</b> owed</span>
+        </p>
       </div>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
-        <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{value}</p>
-        {sub && <p className={`text-xs mt-0.5 ${subColor ?? 'text-gray-400'}`}>{sub}</p>}
-      </div>
+
+      {total > 0 && (
+        <div className="flex items-center gap-4 justify-start sm:justify-end">
+          <svg width="88" height="88" viewBox="0 0 92 92" className="shrink-0">
+            <circle cx="46" cy="46" r="38" fill="none" className="stroke-gray-100 dark:stroke-gray-800" strokeWidth="12" />
+            {savingsPct > 0 && (
+              <circle cx="46" cy="46" r="38" fill="none" className="stroke-emerald-500" strokeWidth="12"
+                strokeDasharray={`${savingsLen} ${circumference}`} strokeLinecap="round" transform="rotate(-90 46 46)" />
+            )}
+            {debtPct > 0 && (
+              <circle cx="46" cy="46" r="38" fill="none" className="stroke-rose-500" strokeWidth="12"
+                strokeDasharray={`${debtLen} ${circumference}`} strokeDashoffset={-savingsLen} strokeLinecap="round" transform="rotate(-90 46 46)" />
+            )}
+          </svg>
+          <div className="flex flex-col gap-1.5 text-xs">
+            <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <span className="w-2 h-2 rounded-sm bg-emerald-500 shrink-0" />
+              Savings <b className="text-gray-900 dark:text-white font-bold">{savingsPct.toFixed(0)}%</b>
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <span className="w-2 h-2 rounded-sm bg-rose-500 shrink-0" />
+              Debt <b className="text-gray-900 dark:text-white font-bold">{debtPct.toFixed(0)}%</b>
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-function AccountsBreakdown({ savings, credits }) {
-  const [tab, setTab] = useState('credit');
+// Horizontal-scroll strip of mini account cards, with a savings/credit toggle
+function AccountsStrip({ savings, credits }) {
+  const [tab, setTab] = useState('savings');
   const [viewAccount, setViewAccount] = useState(null);
   const [editAccount, setEditAccount] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
@@ -216,7 +279,6 @@ function AccountsBreakdown({ savings, credits }) {
   const list = localOrder
     ? localOrder.map((id) => baseList.find((a) => a.id === id)).filter(Boolean)
     : baseList;
-  const total = baseList.reduce((s, a) => s + (a.balance ?? 0), 0);
 
   function handleDragStart(id) {
     dragId.current = id;
@@ -245,82 +307,69 @@ function AccountsBreakdown({ savings, credits }) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <h2 className="text-sm font-bold text-gray-900 dark:text-white">All Active Accounts</h2>
+    <div>
+      <div className="flex items-center gap-3 mb-1">
+        <h2 className="text-sm font-bold text-gray-900 dark:text-white">Accounts</h2>
         <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-semibold shrink-0 ml-auto">
           <button
-            onClick={() => { setTab('credit'); setLocalOrder(null); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${tab === 'credit' ? 'bg-rose-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+            onClick={() => { setTab('savings'); setLocalOrder(null); }}
+            className={`px-3 py-1.5 transition-colors ${tab === 'savings' ? 'bg-emerald-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           >
-            <CreditCard size={12} /> Credit ({credits.length})
+            Savings · {savings.length}
           </button>
           <button
-            onClick={() => { setTab('savings'); setLocalOrder(null); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${tab === 'savings' ? 'bg-emerald-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+            onClick={() => { setTab('credit'); setLocalOrder(null); }}
+            className={`px-3 py-1.5 transition-colors ${tab === 'credit' ? 'bg-rose-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
           >
-            <PiggyBank size={12} /> Savings ({savings.length})
+            Credit · {credits.length}
           </button>
         </div>
       </div>
 
       {list.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-6">No {tab} accounts</p>
+        <p className="text-sm text-gray-400 text-center py-8">No {tab} accounts</p>
       ) : (
-        <>
-          <div className="space-y-2">
-            {list.map((a) => {
-              const isSavings = a.type === 'savings';
-              const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
-              return (
-                <div
-                  key={a.id}
-                  draggable={!isTouch}
-                  onDragStart={!isTouch ? () => handleDragStart(a.id) : undefined}
-                  onDragOver={!isTouch ? (e) => handleDragOver(e, a.id) : undefined}
-                  onDrop={!isTouch ? handleDrop : undefined}
-                  className="flex items-center gap-2 py-2 border-b border-gray-50 dark:border-gray-800 last:border-0 group"
-                >
-                  {!isTouch && (
-                    <div className="p-1 text-gray-300 dark:text-gray-700 cursor-grab active:cursor-grabbing shrink-0">
-                      <GripVertical size={13} />
+        <div className="flex gap-3 overflow-x-auto pt-3 pb-1 -mx-0.5 px-0.5">
+          {list.map((a) => {
+            const isSavings = a.type === 'savings';
+            const pct = a.credit_limit ? Math.min((a.balance / a.credit_limit) * 100, 100) : null;
+            return (
+              <button
+                key={a.id}
+                draggable={!isTouch}
+                onDragStart={!isTouch ? () => handleDragStart(a.id) : undefined}
+                onDragOver={!isTouch ? (e) => handleDragOver(e, a.id) : undefined}
+                onDrop={!isTouch ? handleDrop : undefined}
+                onClick={() => setViewAccount(a)}
+                className="shrink-0 w-[180px] text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <BankLogo name={a.name} sizeClass="w-8 h-8" fallback={isSavings ? (
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                      <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
                     </div>
-                  )}
-                  <button
-                    onClick={() => setViewAccount(a)}
-                    className="flex-1 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl px-2 py-0.5 -mx-2 transition-colors text-left min-w-0"
-                  >
-                    <BankLogo name={a.name} sizeClass="w-8 h-8" fallback={isSavings ? (
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
-                        <PiggyBank size={14} className="text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                    ) : undefined} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
-                        {a.name}{a.belongs_to_username && <span className="text-gray-400 font-normal"> · {a.belongs_to_username}</span>}
-                      </p>
-                      {pct !== null && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 h-1 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-[11px] text-gray-400 shrink-0">{pct.toFixed(0)}%</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className={`text-sm font-bold shrink-0 ${isSavings ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                      {fmtUSD(a.balance)}
-                    </p>
-                  </button>
+                  ) : undefined} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{a.name}</p>
+                    {a.belongs_to_username && <p className="text-[11px] text-gray-400 truncate">{a.belongs_to_username}</p>}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-          <div className={`mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between text-xs font-semibold ${tab === 'credit' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-            <span>Total {tab === 'credit' ? 'outstanding' : 'balance'}</span>
-            <span>{fmtUSD(total)}</span>
-          </div>
-        </>
+                <p className={`text-lg font-extrabold tracking-tight ${isSavings ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                  {fmtUSD(a.balance)}
+                </p>
+                {pct !== null && (
+                  <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                    <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-[11px] text-gray-400">
+                  <span>{isSavings ? (a.is_liquid ? 'Liquid' : 'Non-liquid') : (pct !== null ? `${pct.toFixed(0)}% used` : '—')}</span>
+                  {a.updated_at && <span>Updated {fmtDate(a.updated_at.split(' ')[0])}</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
       {viewAccount && (
         <AccountDetailModal
@@ -336,80 +385,6 @@ function AccountsBreakdown({ savings, credits }) {
   );
 }
 
-const is401k = (a) => /401k|principal/i.test(a.name ?? '');
-
-function UserStatSection({ label, accts }) {
-  const allSavings = accts.filter((a) => a.type === 'savings');
-  const savings401k = allSavings.filter(is401k);
-  const savings = allSavings.filter((a) => !is401k(a));
-  const credits = accts.filter((a) => a.type === 'credit');
-  const totalSavings     = savings.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const total401k        = savings401k.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const totalOutstanding = credits.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const totalCreditLimit = credits.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
-  const totalAvailable   = totalCreditLimit - totalOutstanding;
-  const netWorth         = totalSavings - totalOutstanding;
-  const netWorthWith401k = totalSavings + total401k - totalOutstanding;
-
-  return (
-    <div>
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{label}</p>
-      <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
-        <StatCard
-          icon={TrendingUp}
-          iconBg={netWorth >= 0 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-red-100 dark:bg-red-900/30'}
-          iconColor={netWorth >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}
-          label="Net Worth"
-          value={fmtUSD(netWorth)}
-          sub={netWorth >= 0 ? 'excl. 401k' : 'debt exceeds savings'}
-          subColor={netWorth >= 0 ? 'text-blue-500' : 'text-red-400'}
-        />
-        <StatCard
-          icon={TrendingUp}
-          iconBg={netWorthWith401k >= 0 ? 'bg-cyan-100 dark:bg-cyan-900/30' : 'bg-red-100 dark:bg-red-900/30'}
-          iconColor={netWorthWith401k >= 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-red-500'}
-          label="Net Worth (+401k)"
-          value={fmtUSD(netWorthWith401k)}
-          sub={netWorthWith401k >= 0 ? 'incl. 401k' : 'debt exceeds savings'}
-          subColor={netWorthWith401k >= 0 ? 'text-cyan-500' : 'text-red-400'}
-        />
-        <StatCard
-          icon={PiggyBank}
-          iconBg="bg-emerald-100 dark:bg-emerald-900/30"
-          iconColor="text-emerald-600 dark:text-emerald-400"
-          label="Total Savings"
-          value={fmtUSD(totalSavings)}
-          sub={`${savings.length} account${savings.length !== 1 ? 's' : ''}`}
-        />
-        <StatCard
-          icon={PiggyBank}
-          iconBg="bg-indigo-100 dark:bg-indigo-900/30"
-          iconColor="text-indigo-600 dark:text-indigo-400"
-          label="401k Balance"
-          value={fmtUSD(total401k)}
-          sub={`${savings401k.length} account${savings401k.length !== 1 ? 's' : ''}`}
-        />
-        <StatCard
-          icon={CreditCard}
-          iconBg="bg-rose-100 dark:bg-rose-900/30"
-          iconColor="text-rose-600 dark:text-rose-400"
-          label="Outstanding"
-          value={fmtUSD(totalOutstanding)}
-          sub={`${credits.length} card${credits.length !== 1 ? 's' : ''}`}
-        />
-        <StatCard
-          icon={AlertCircle}
-          iconBg="bg-amber-100 dark:bg-amber-900/30"
-          iconColor="text-amber-600 dark:text-amber-400"
-          label="Available Credit"
-          value={fmtUSD(totalAvailable >= 0 ? totalAvailable : 0)}
-          sub={totalCreditLimit > 0 ? `of ${fmtUSD(totalCreditLimit)} limit` : 'no credit limit set'}
-        />
-      </div>
-    </div>
-  );
-}
-
 export default function AccountsDashboard() {
   const { user } = useAuth();
   const isAdmin = !!user?.is_admin;
@@ -417,6 +392,7 @@ export default function AccountsDashboard() {
   const { data: pmtData, isLoading: pmtLoading } = useAccountPayments();
   const [payingAccount, setPayingAccount] = useState(null);
   const [carPaymentOpen, setCarPaymentOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState('all');
   const [carCfg, setCarCfg] = useState(() => { try { return JSON.parse(localStorage.getItem('car_finance_config') || '{}'); } catch { return {}; } });
 
   useEffect(() => {
@@ -433,8 +409,15 @@ export default function AccountsDashboard() {
   // Users that have at least one account assigned
   const userNames = [...new Set(activeAccounts.map((a) => a.belongs_to_username).filter(Boolean))].sort();
 
-  const allSavings = activeAccounts.filter((a) => a.type === 'savings');
-  const allCredits = activeAccounts.filter((a) => a.type === 'credit');
+  const scopedAccounts = selectedUser === 'all' ? activeAccounts : activeAccounts.filter((a) => a.belongs_to_username === selectedUser);
+  const allSavings = scopedAccounts.filter((a) => a.type === 'savings' && !is401k(a));
+  const all401k = scopedAccounts.filter((a) => a.type === 'savings' && is401k(a));
+  const allCredits = scopedAccounts.filter((a) => a.type === 'credit');
+  const totalCreditLimit = allCredits.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
+  const totalOutstanding = allCredits.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const totalSavings = allSavings.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const total401k = all401k.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const totalAvailable = totalCreditLimit - totalOutstanding;
 
   const upcomingDue = useMemo(() => {
     const credits = allCredits
@@ -469,21 +452,69 @@ export default function AccountsDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Overview of your credit &amp; savings accounts</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Credit &amp; Savings</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Overview across all accounts</p>
+        </div>
+        {userNames.length > 0 && (
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
+            <button
+              onClick={() => setSelectedUser('all')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${selectedUser === 'all' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+            >
+              All
+            </button>
+            {userNames.map((name) => (
+              <button
+                key={name}
+                onClick={() => setSelectedUser(name)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${selectedUser === name ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Stat sections — All + per user */}
-      <div className="space-y-6">
-        <UserStatSection label="All" accts={activeAccounts} />
-        {userNames.map((name) => (
-          <UserStatSection
-            key={name}
-            label={name}
-            accts={activeAccounts.filter((a) => a.belongs_to_username === name)}
-          />
-        ))}
+      {/* Net worth hero */}
+      <NetWorthHero accts={scopedAccounts} />
+
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile
+          icon={PiggyBank}
+          iconBg="bg-emerald-100 dark:bg-emerald-900/30"
+          iconColor="text-emerald-600 dark:text-emerald-400"
+          label="Total Savings"
+          value={fmtUSD(totalSavings)}
+          sub={`${allSavings.length} account${allSavings.length !== 1 ? 's' : ''}`}
+        />
+        <StatTile
+          icon={CreditCard}
+          iconBg="bg-rose-100 dark:bg-rose-900/30"
+          iconColor="text-rose-600 dark:text-rose-400"
+          label="Outstanding"
+          value={fmtUSD(totalOutstanding)}
+          sub={`${allCredits.length} card${allCredits.length !== 1 ? 's' : ''}`}
+        />
+        <StatTile
+          icon={AlertCircle}
+          iconBg="bg-amber-100 dark:bg-amber-900/30"
+          iconColor="text-amber-600 dark:text-amber-400"
+          label="Available Credit"
+          value={fmtUSD(totalAvailable >= 0 ? totalAvailable : 0)}
+          sub={totalCreditLimit > 0 ? `of ${fmtUSD(totalCreditLimit)} limit` : 'no limit set'}
+        />
+        <StatTile
+          icon={Landmark}
+          iconBg="bg-indigo-100 dark:bg-indigo-900/30"
+          iconColor="text-indigo-600 dark:text-indigo-400"
+          label="401k Balance"
+          value={fmtUSD(total401k)}
+          sub={`${all401k.length} account${all401k.length !== 1 ? 's' : ''}`}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -594,9 +625,9 @@ export default function AccountsDashboard() {
         </div>
       </div>
 
-      {/* Accounts breakdown */}
-      {activeAccounts.length > 0 && (
-        <AccountsBreakdown savings={allSavings} credits={allCredits} />
+      {/* Accounts strip */}
+      {scopedAccounts.length > 0 && (
+        <AccountsStrip savings={scopedAccounts.filter((a) => a.type === 'savings')} credits={allCredits} />
       )}
 
       {carPaymentOpen && (
