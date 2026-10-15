@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bird, Plus, Pencil, Trash2, X, Check, CalendarDays, AlertCircle, FileText, Upload, ShoppingCart } from 'lucide-react';
+import { Bird, Plus, Pencil, Trash2, X, Check, CalendarDays, AlertCircle, FileText, Upload, ShoppingCart, Download } from 'lucide-react';
 import PoultryBillModal from './PoultryBillModal';
 
 const API = '/api/poultry/flock';
@@ -18,6 +18,25 @@ function addDays(dateStr, n) {
 function daysSince(dateStr) {
   const diff = Date.now() - new Date(dateStr + 'T00:00:00').getTime();
   return Math.floor(diff / 86400000);
+}
+
+async function downloadBill(batch, bill) {
+  if (!bill?.image_path) return;
+  const ext = bill.image_path.split('.').pop();
+  const safeBatch = (batch.name || 'batch').trim().replace(/\s+/g, '_');
+  const safeDate = (bill.bill_date || 'nodate').trim().replace(/[\\/]/g, '.').replace(/\s+/g, '_');
+  const filename = `${safeBatch}_${safeDate}.${ext}`;
+
+  const res = await fetch(`/uploads/${bill.image_path}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function BatchModal({ initial, initialDeaths, onClose, onSave }) {
@@ -230,6 +249,12 @@ function BatchCard({ batch, deaths, bill, onEdit, onDelete, onMarkSold, onUpload
           {bill ? <FileText size={14} /> : <Upload size={14} />}
           {bill ? 'View Bill' : 'Upload Bill'}
         </button>
+        {bill?.image_path && (
+          <button onClick={() => downloadBill(batch, bill)} title="Download bill"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+            <Download size={14} />
+          </button>
+        )}
         <button onClick={() => onViewExpenses(batch)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20">
           <ShoppingCart size={14} /> View Expenses
