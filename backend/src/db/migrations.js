@@ -441,6 +441,28 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_returns_workspace ON returns(workspace);
   `);
 
+  // Pantry log (household stock on hand)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pantry_items (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace     TEXT NOT NULL DEFAULT 'us',
+      name          TEXT NOT NULL,
+      quantity      REAL NOT NULL DEFAULT 0,
+      unit          TEXT NOT NULL DEFAULT 'pcs',
+      low_stock_at  REAL DEFAULT NULL,
+      notes         TEXT DEFAULT NULL,
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT DEFAULT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_pantry_items_user ON pantry_items(user_id);
+    CREATE INDEX IF NOT EXISTS idx_pantry_items_workspace ON pantry_items(workspace);
+    CREATE TRIGGER IF NOT EXISTS pantry_items_updated_at
+      AFTER UPDATE ON pantry_items FOR EACH ROW
+      BEGIN UPDATE pantry_items SET updated_at = datetime('now') WHERE id = OLD.id; END;
+  `);
+
   // Health & Diet
   db.exec(`
     CREATE TABLE IF NOT EXISTS health_meals (

@@ -9,6 +9,7 @@ import AccountsDashboard from './pages/accounts/AccountsDashboard';
 import SavingsPage from './pages/accounts/SavingsPage';
 import CreditCardsPage from './pages/accounts/CreditCardsPage';
 import ReturnsPage from './pages/accounts/ReturnsPage';
+import PantryPage from './pages/PantryPage';
 import PaymentsPage from './pages/accounts/PaymentsPage';
 import CarFinancePage from './pages/accounts/CarFinancePage';
 import DashboardPage from './pages/DashboardPage';
@@ -124,6 +125,7 @@ export default function App() {
             <Route path="poultry/uma-sbi" element={<UmaSbiPage />} />
             <Route path="trips"         element={<TripsPage />} />
             <Route path="returns"       element={<ReturnsPage />} />
+            <Route path="pantry"        element={<PantryPage />} />
             <Route path="brainstorm"    element={<BrainstormPage />} />
             <Route path="brainstorm/:id" element={<BrainstormDetailPage />} />
             <Route path="property"      element={<PropertyPage />} />
