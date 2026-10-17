@@ -589,7 +589,7 @@ export default function AccountsDashboard() {
                         <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
                       </div>
                     </div>
-                    <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
+                    <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} autopay={a.autopay} />
                   </button>
                 ) : (
                   <div key={a.id} className="flex items-center justify-between gap-3">
@@ -602,7 +602,7 @@ export default function AccountsDashboard() {
                         <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fmtUSD(a.balance)} outstanding</p>
                       </div>
                     </div>
-                    <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
+                    <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} autopay={a.autopay} />
                   </div>
                 );
               })}

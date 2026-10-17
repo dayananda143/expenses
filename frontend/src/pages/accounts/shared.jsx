@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets, Target, Link2 } from 'lucide-react';
+import { GripVertical, CreditCard, PiggyBank, Calendar, CalendarClock, Pencil, Trash2, X, EyeOff, AlertTriangle, DollarSign, Percent, Info, History, Archive, ArchiveX, Droplets, Target, Link2, CheckCircle2 } from 'lucide-react';
 import { useCreateAccount, useUpdateAccount } from '../../hooks/useAccounts';
 import { useAccountPayments } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -137,11 +137,22 @@ export function fmtDateTime(dateStr) {
 
 // ─── Badges ──────────────────────────────────────────────────────────────────
 
-export function DueBadge({ day, lastPaidDate }) {
+export function DueBadge({ day, lastPaidDate, autopay }) {
   if (!day) return null;
   const due = nextDueDate(day, lastPaidDate);
   const days = daysFromToday(due);
   if (days === null) return null;
+
+  // Autopay is handling it — show a quiet confirmation instead of an urgency countdown,
+  // unless it's actually overdue (autopay may have failed and still needs attention).
+  if (autopay && days >= 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800">
+        <CheckCircle2 size={10} />Autopay · {fmtDate(due)}
+      </span>
+    );
+  }
+
   const cls =
     days <= 3 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800' :
     days <= 7 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
@@ -257,7 +268,8 @@ export function AccountModal({ account, defaultType, onClose }) {
       is_liquid: account.is_liquid !== 0,
       goal_amount: account.goal_amount ?? '', goal_date: account.goal_date ?? '',
       website_url: account.website_url ?? '',
-    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false, goal_amount: '', goal_date: '', website_url: '' },
+      autopay: account.autopay !== 0 && !!account.autopay,
+    } : { type: defaultType ?? 'savings', balance: '', credit_limit: '', due_day: '', promo_apr_end_date: '', is_active: true, notes: '', belongs_to_user_id: '', is_liquid: false, goal_amount: '', goal_date: '', website_url: '', autopay: false },
   });
   const type = watch('type');
   const name = watch('name');
@@ -354,6 +366,13 @@ export function AccountModal({ account, defaultType, onClose }) {
                   <input type="date" {...register('promo_apr_end_date')} className={inputCls} />
                 </div>
               </div>
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <input type="checkbox" {...register('autopay')} className="w-4 h-4 accent-cyan-600 rounded" />
+                <div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Autopay enabled</span>
+                  <p className="text-xs text-gray-400">Due-date reminders stay quiet instead of warning you</p>
+                </div>
+              </label>
             </>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -512,11 +531,12 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
                       {fmtFullDate(dueDate)}
                       {daysUntilDue !== null && (
                         <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${
+                          a.autopay && daysUntilDue >= 0 ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400' :
                           daysUntilDue <= 3 ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
                           daysUntilDue <= 7 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' :
                           'bg-gray-100 dark:bg-gray-800 text-gray-500'
                         }`}>
-                          {daysUntilDue === 0 ? 'today' : daysUntilDue < 0 ? `${Math.abs(daysUntilDue)}d overdue` : `${daysUntilDue}d`}
+                          {a.autopay && daysUntilDue >= 0 ? 'autopay' : daysUntilDue === 0 ? 'today' : daysUntilDue < 0 ? `${Math.abs(daysUntilDue)}d overdue` : `${daysUntilDue}d`}
                         </span>
                       )}
                     </span>
@@ -525,6 +545,9 @@ export function AccountDetailModal({ a, onClose, onEdit, onPayment }) {
               )}
               {a.due_day && (
                 <DetailRow label="Due Day" value={`Day ${a.due_day} of every month`} />
+              )}
+              {!!a.autopay && (
+                <DetailRow label="Autopay" value="Enabled" valueClass="text-cyan-600 dark:text-cyan-400" />
               )}
               {a.promo_apr_end_date && promoDays !== null && promoDays >= 0 && (
                 <DetailRow
@@ -888,7 +911,7 @@ export function AccountCard({ a, onEdit, onDelete, onArchive, onDragStart, onDra
 
           {/* Badges row */}
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} />
+            <DueBadge day={a.due_day} lastPaidDate={a.last_paid_date} autopay={a.autopay} />
             <PromoBadge date={a.promo_apr_end_date} />
           </div>
 
