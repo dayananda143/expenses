@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { TrendingUp, TrendingDown, CreditCard, PiggyBank, AlertCircle, Calendar, X, Car, Landmark, Download } from 'lucide-react';
 import { useAccounts, useReorderAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment } from '../../hooks/useAccountPayments';
+import { useNetWorthHistory, useRecordNetWorthSnapshot } from '../../hooks/useNetWorth';
 import { useAuth } from '../../contexts/AuthContext';
 import { WS, fmtUSD, fmtUSDDecimal, fmtFullDate, fmtDate, nextDueDate, daysFromToday, DueBadge, AccountDetailModal, AccountModal, BankLogo } from './shared';
 
@@ -264,6 +265,69 @@ function NetWorthHero({ accts }) {
   );
 }
 
+// Net worth trend — records a snapshot once per day and charts history over time
+function NetWorthTrend() {
+  const { data, isLoading } = useNetWorthHistory(12);
+  const recordSnapshot = useRecordNetWorthSnapshot();
+  const recordedRef = useRef(false);
+
+  useEffect(() => {
+    if (!recordedRef.current) {
+      recordedRef.current = true;
+      recordSnapshot.mutate();
+    }
+  }, []);
+
+  const points = data?.data ?? [];
+  if (isLoading) return null;
+
+  if (points.length < 2) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 flex items-center gap-3">
+        <TrendingUp size={16} className="text-gray-300 dark:text-gray-700 shrink-0" />
+        <p className="text-xs text-gray-400">Tracking net worth daily from today — check back tomorrow to see the trend.</p>
+      </div>
+    );
+  }
+
+  const latest = points[points.length - 1];
+  const monthAgo = points.find((p) => new Date(p.date) <= new Date(new Date(latest.date).setMonth(new Date(latest.date).getMonth() - 1)));
+  const compareFrom = monthAgo ?? points[0];
+  const delta = latest.net_worth - compareFrom.net_worth;
+  const deltaPct = compareFrom.net_worth !== 0 ? (delta / Math.abs(compareFrom.net_worth)) * 100 : 0;
+  const positive = delta >= 0;
+
+  // Build a simple line+area sparkline
+  const w = 100, h = 32;
+  const values = points.map((p) => p.net_worth);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const coords = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * w;
+    const y = h - ((p.net_worth - min) / range) * h;
+    return [x, y];
+  });
+  const linePath = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 flex items-center gap-5">
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">vs. last month</p>
+        <p className={`text-lg font-extrabold tracking-tight flex items-center gap-1 ${positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+          {positive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+          {positive ? '+' : ''}{fmtUSD(delta)}
+          <span className="text-xs font-semibold text-gray-400">({positive ? '+' : ''}{deltaPct.toFixed(1)}%)</span>
+        </p>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="flex-1 h-10 min-w-0">
+        <path d={areaPath} fill={positive ? 'rgb(16 185 129 / 0.12)' : 'rgb(244 63 94 / 0.12)'} />
+        <path d={linePath} fill="none" stroke={positive ? 'rgb(16 185 129)' : 'rgb(244 63 94)'} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+    </div>
+  );
+}
+
 const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 // Horizontal-scroll strip of mini account cards, with a savings/credit toggle
@@ -496,6 +560,9 @@ export default function AccountsDashboard() {
 
       {/* Net worth hero */}
       <NetWorthHero accts={scopedAccounts} />
+
+      {/* Net worth trend — tracks the whole workspace, so only meaningful on the "All" tab */}
+      {selectedUser === 'all' && <NetWorthTrend />}
 
       {/* Secondary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

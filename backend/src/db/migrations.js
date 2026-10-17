@@ -464,6 +464,21 @@ function runMigrations(db) {
       BEGIN UPDATE pantry_items SET updated_at = datetime('now') WHERE id = OLD.id; END;
   `);
 
+  // Net worth snapshots (one row per workspace per day, for trend charting)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace     TEXT NOT NULL,
+      date          TEXT NOT NULL,
+      total_savings REAL NOT NULL DEFAULT 0,
+      total_401k    REAL NOT NULL DEFAULT 0,
+      total_credit  REAL NOT NULL DEFAULT 0,
+      net_worth     REAL NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_net_worth_snapshots_ws_date ON net_worth_snapshots(workspace, date);
+  `);
+
   // Health & Diet
   db.exec(`
     CREATE TABLE IF NOT EXISTS health_meals (
