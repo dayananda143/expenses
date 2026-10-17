@@ -33,6 +33,43 @@ router.get('/', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/accounts/export/csv?workspace=us
+router.get('/export/csv', (req, res, next) => {
+  try {
+    const rows = db.prepare(
+      `SELECT a.*, u.username AS belongs_to_username
+       FROM accounts a
+       LEFT JOIN users u ON u.id = a.belongs_to_user_id
+       WHERE ${adminUserWhere} AND a.workspace = ?
+       ORDER BY a.type ASC, a.sort_order ASC`
+    ).all(req.workspace);
+
+    const lines = [
+      'name,type,belongs_to,balance,credit_limit,due_day,is_liquid,goal_amount,goal_date,active,archived,website_url,notes',
+      ...rows.map((r) => [
+        `"${(r.name ?? '').replace(/"/g, '""')}"`,
+        r.type,
+        `"${(r.belongs_to_username ?? '').replace(/"/g, '""')}"`,
+        r.balance,
+        r.credit_limit ?? '',
+        r.due_day ?? '',
+        r.is_liquid ? 'yes' : 'no',
+        r.goal_amount ?? '',
+        r.goal_date ?? '',
+        r.is_active ? 'yes' : 'no',
+        r.archived ? 'yes' : 'no',
+        `"${(r.website_url ?? '').replace(/"/g, '""')}"`,
+        `"${(r.notes ?? '').replace(/"/g, '""')}"`,
+      ].join(',')),
+    ];
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="accounts-${req.workspace}-${date}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (err) { next(err); }
+});
+
 // POST /api/accounts?workspace=us
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });

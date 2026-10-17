@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Trash2, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, CreditCard, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment, useDeletePayment } from '../../hooks/useAccountPayments';
 import { WS, fmtUSDDecimal, fmtFullDate, BankLogo } from './shared';
@@ -116,6 +116,18 @@ export default function PaymentsPage() {
     setPage(1);
   }
 
+  function handleExport() {
+    const token = localStorage.getItem('expenses_token');
+    fetch(`/api/account-payments/export/csv?workspace=${WS}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.blob())
+      .then((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `payments-${WS}-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+      });
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -179,6 +191,14 @@ export default function PaymentsPage() {
             )}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {payments.length > 0 && (
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Download size={12} /> Export
+              </button>
+            )}
             {/* Month range pickers */}
             <div className="flex items-center gap-1.5">
               <input

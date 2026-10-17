@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { TrendingUp, TrendingDown, CreditCard, PiggyBank, AlertCircle, Calendar, X, Car, Landmark } from 'lucide-react';
+import { TrendingUp, TrendingDown, CreditCard, PiggyBank, AlertCircle, Calendar, X, Car, Landmark, Download } from 'lucide-react';
 import { useAccounts, useReorderAccounts } from '../../hooks/useAccounts';
 import { useAccountPayments, useCreatePayment } from '../../hooks/useAccountPayments';
 import { useAuth } from '../../contexts/AuthContext';
@@ -457,6 +457,22 @@ export default function AccountsDashboard() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Credit &amp; Savings</h1>
           <p className="text-sm text-gray-400 mt-0.5">Overview across all accounts</p>
         </div>
+        <button
+          onClick={() => {
+            const token = localStorage.getItem('expenses_token');
+            fetch(`/api/accounts/export/csv?workspace=${WS}`, { headers: { Authorization: `Bearer ${token}` } })
+              .then((r) => r.blob())
+              .then((blob) => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `accounts-${WS}-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+              });
+          }}
+          className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          <Download size={12} /> Export Accounts
+        </button>
         {userNames.length > 0 && (
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
             <button

@@ -35,6 +35,36 @@ router.get('/', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/account-payments/export/csv?workspace=us
+router.get('/export/csv', (req, res, next) => {
+  try {
+    const rows = db.prepare(`
+      SELECT p.*, a.name AS account_name, u.username AS belongs_to_username
+      FROM account_payments p
+      JOIN accounts a ON a.id = p.account_id
+      LEFT JOIN users u ON u.id = a.belongs_to_user_id
+      WHERE ${adminUserWhere} AND p.workspace = ?
+      ORDER BY p.date DESC, p.created_at DESC
+    `).all(req.workspace);
+
+    const lines = [
+      'date,account,belongs_to,amount,notes',
+      ...rows.map((r) => [
+        r.date,
+        `"${(r.account_name ?? '').replace(/"/g, '""')}"`,
+        `"${(r.belongs_to_username ?? '').replace(/"/g, '""')}"`,
+        r.amount,
+        `"${(r.notes ?? '').replace(/"/g, '""')}"`,
+      ].join(',')),
+    ];
+
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="payments-${req.workspace}-${date}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (err) { next(err); }
+});
+
 // POST /api/account-payments?workspace=us
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
