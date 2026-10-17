@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, Package, Minus, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Package, Minus, AlertTriangle } from 'lucide-react';
 import {
   usePantryItems, useCreatePantryItem, useUpdatePantryItem,
   useAdjustPantryItem, useDeletePantryItem, useReorderPantry,
@@ -197,7 +197,7 @@ export default function PantryPage() {
       )}
 
       {!isLoading && items.length > 0 && (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {items.map((item) => {
             const low = isLow(item);
             return (
@@ -207,56 +207,51 @@ export default function PantryPage() {
                 onDragStart={() => handleDragStart(item.id)}
                 onDragOver={(e) => handleDragOver(e, item.id)}
                 onDrop={handleDrop}
-                className={`bg-white dark:bg-gray-900 rounded-xl border px-4 py-3 flex items-center gap-3 group ${low ? 'border-amber-300 dark:border-amber-700' : 'border-gray-200 dark:border-gray-700'}`}
+                className={`bg-white dark:bg-gray-900 rounded-xl border p-3 flex flex-col gap-2 group ${low ? 'border-amber-300 dark:border-amber-700' : 'border-gray-200 dark:border-gray-700'}`}
               >
-                <div className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-400 shrink-0">
-                  <GripVertical size={15} />
-                </div>
-
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${low ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-teal-50 dark:bg-teal-900/20'}`}>
-                  {low ? <AlertTriangle size={13} className="text-amber-600 dark:text-amber-400" /> : <Package size={13} className="text-teal-600 dark:text-teal-400" />}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-start gap-2">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${low ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-teal-50 dark:bg-teal-900/20'}`}>
+                    {low ? <AlertTriangle size={13} className="text-amber-600 dark:text-amber-400" /> : <Package size={13} className="text-teal-600 dark:text-teal-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate" title={item.name}>{item.name}</p>
                     <span className={`text-[11px] font-medium ${low ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'}`}>
-                      {low ? `Low · at or below ${fmtQty(item.low_stock_at)} ${item.unit}` : item.unit}
+                      {low ? `Low · ≤ ${fmtQty(item.low_stock_at)} ${item.unit}` : item.unit}
                     </span>
-                    {item.notes && <span className="text-[11px] text-gray-400 truncate">· {item.notes}</span>}
+                  </div>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button
+                      onClick={() => { setEditItem(item); setShowModal(true); }}
+                      className="p-1 text-gray-400 hover:text-teal-600 rounded-md hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(item)}
+                      className="p-1 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </div>
 
+                {item.notes && <p className="text-[11px] text-gray-400 truncate">{item.notes}</p>}
+
                 {/* Quantity adjuster */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center justify-between gap-1.5 mt-auto pt-1">
                   <button
                     onClick={() => adjust.mutate({ id: item.id, delta: -1 })}
                     disabled={item.quantity <= 0}
-                    className="w-6 h-6 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 flex items-center justify-center transition-colors"
+                    className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 flex items-center justify-center transition-colors"
                   >
-                    <Minus size={12} />
+                    <Minus size={13} />
                   </button>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white w-10 text-center tabular-nums">{fmtQty(item.quantity)}</span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white text-center tabular-nums">{fmtQty(item.quantity)}</span>
                   <button
                     onClick={() => adjust.mutate({ id: item.id, delta: 1 })}
-                    className="w-6 h-6 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                    className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                   >
-                    <Plus size={12} />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => { setEditItem(item); setShowModal(true); }}
-                    className="p-1.5 text-gray-400 hover:text-teal-600 rounded-md hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(item)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    <Trash2 size={13} />
+                    <Plus size={13} />
                   </button>
                 </div>
               </div>
