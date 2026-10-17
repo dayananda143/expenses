@@ -395,7 +395,7 @@ export default function ExpensesPage() {
   const [filterYear, setFilterYear] = useState(initialYear);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [filters, setFilters] = useState({ category_id: initialCategoryId, search: '' });
+  const [filters, setFilters] = useState({ category_id: initialCategoryId, trip_id: '', search: '' });
   const [sort, setSort] = useState('date');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(1);
@@ -453,12 +453,12 @@ export default function ExpensesPage() {
   function handleMonthChange(m, y) { setFilterMonth(m); setFilterYear(y); setPage(1); }
   function clearMonthFilter() { setFilterMonth(null); setPage(1); }
 
-  const hasActiveFilters = filters.search !== '' || filters.category_id !== '' ||
+  const hasActiveFilters = filters.search !== '' || filters.category_id !== '' || filters.trip_id !== '' ||
     (filterMode === 'range' && (dateFrom || dateTo)) ||
     (filterMode === 'month' && filterMonth !== null && (filterMonth !== now.getMonth() + 1 || filterYear !== now.getFullYear()));
 
   function clearAllFilters() {
-    setFilters({ category_id: '', search: '' });
+    setFilters({ category_id: '', trip_id: '', search: '' });
     setFilterMode('month');
     setFilterMonth(now.getMonth() + 1);
     setFilterYear(now.getFullYear());
@@ -545,7 +545,7 @@ export default function ExpensesPage() {
       {/* Filters */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
         <div className="flex items-start gap-2">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 flex-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -558,6 +558,11 @@ export default function ExpensesPage() {
           <select value={filters.category_id} onChange={(e) => setFilter('category_id', e.target.value)} className={inputCls}>
             <option value="">All Categories</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={filters.trip_id} onChange={(e) => setFilter('trip_id', e.target.value)} className={inputCls}>
+            <option value="">All Trips/Functions</option>
+            <option value="none">Unassigned</option>
+            {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
           <div className="flex items-center gap-2">
             {/* Mode toggle */}

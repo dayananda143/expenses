@@ -6,7 +6,7 @@ const requireWorkspace = require('../middleware/workspace');
 router.use(requireWorkspace);
 
 function buildWhere(query, workspace, userId, isAdmin) {
-  const { category_id, date_from, date_to, search, user_id, month, year, type } = query;
+  const { category_id, trip_id, date_from, date_to, search, user_id, month, year, type } = query;
   const where = ['e.workspace = ?'];
   const params = [workspace];
 
@@ -21,6 +21,15 @@ function buildWhere(query, workspace, userId, isAdmin) {
   if (category_id && category_id !== 'all') {
     where.push('e.category_id = ?');
     params.push(parseInt(category_id));
+  }
+
+  if (trip_id && trip_id !== 'all') {
+    if (trip_id === 'none') {
+      where.push('e.trip_id IS NULL');
+    } else {
+      where.push('e.trip_id = ?');
+      params.push(parseInt(trip_id));
+    }
   }
 
   // month+year filter takes precedence over date_from/date_to
