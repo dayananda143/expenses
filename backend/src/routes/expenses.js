@@ -73,6 +73,12 @@ router.get('/', (req, res, next) => {
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const total = db.prepare(`SELECT COUNT(*) as count FROM expenses e ${whereClause}`).get(...params).count;
+    const totals = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN e.type = 'credit' THEN e.amount ELSE 0 END), 0) AS credit,
+        COALESCE(SUM(CASE WHEN e.type != 'credit' THEN e.amount ELSE 0 END), 0) AS debit
+      FROM expenses e ${whereClause}
+    `).get(...params);
     const rows = db.prepare(`
       SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
       FROM expenses e
@@ -82,7 +88,11 @@ router.get('/', (req, res, next) => {
       LIMIT ? OFFSET ?
     `).all(...params, parseInt(limit), offset);
 
-    res.json({ data: rows, pagination: { page: parseInt(page), limit: parseInt(limit), total, total_pages: Math.ceil(total / parseInt(limit)) } });
+    res.json({
+      data: rows,
+      pagination: { page: parseInt(page), limit: parseInt(limit), total, total_pages: Math.ceil(total / parseInt(limit)) },
+      totals: { amount: totals.debit - totals.credit, debit: totals.debit, credit: totals.credit },
+    });
   } catch (err) {
     next(err);
   }

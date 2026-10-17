@@ -434,6 +434,7 @@ export default function ExpensesPage() {
 
   const expenses = data?.data ?? [];
   const pagination = data?.pagination;
+  const totals = data?.totals;
 
   function openAdd() {
     setEditExpense(filters.category_id ? { category_id: filters.category_id, date: new Date().toLocaleDateString('en-CA'), subtype: '', notes: '', is_recurring: false } : null);
@@ -517,7 +518,12 @@ export default function ExpensesPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Expenses</h1>
-          {pagination && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{pagination.total} expense{pagination.total !== 1 ? 's' : ''}</p>}
+          {pagination && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {pagination.total} expense{pagination.total !== 1 ? 's' : ''}
+              {totals && <> · <span className="font-semibold text-gray-700 dark:text-gray-300">{fmt(totals.amount)}</span> total</>}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
