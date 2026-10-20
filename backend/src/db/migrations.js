@@ -501,6 +501,28 @@ function runMigrations(db) {
       BEGIN UPDATE baby_items SET updated_at = datetime('now') WHERE id = OLD.id; END;
   `);
 
+  // Thanksgiving shopping list
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS thanksgiving_items (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace   TEXT NOT NULL DEFAULT 'us',
+      name        TEXT NOT NULL,
+      link        TEXT DEFAULT NULL,
+      amount      REAL DEFAULT NULL,
+      purchased   INTEGER NOT NULL DEFAULT 0,
+      notes       TEXT DEFAULT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT DEFAULT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_thanksgiving_items_user ON thanksgiving_items(user_id);
+    CREATE INDEX IF NOT EXISTS idx_thanksgiving_items_workspace ON thanksgiving_items(workspace);
+    CREATE TRIGGER IF NOT EXISTS thanksgiving_items_updated_at
+      AFTER UPDATE ON thanksgiving_items FOR EACH ROW
+      BEGIN UPDATE thanksgiving_items SET updated_at = datetime('now') WHERE id = OLD.id; END;
+  `);
+
   // Health & Diet
   db.exec(`
     CREATE TABLE IF NOT EXISTS health_meals (

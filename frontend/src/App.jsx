@@ -11,6 +11,7 @@ import CreditCardsPage from './pages/accounts/CreditCardsPage';
 import ReturnsPage from './pages/accounts/ReturnsPage';
 import PantryPage from './pages/PantryPage';
 import BabyPage from './pages/BabyPage';
+import ThanksgivingPage from './pages/ThanksgivingPage';
 import PaymentsPage from './pages/accounts/PaymentsPage';
 import CarFinancePage from './pages/accounts/CarFinancePage';
 import DashboardPage from './pages/DashboardPage';
@@ -128,6 +129,7 @@ export default function App() {
             <Route path="returns"       element={<ReturnsPage />} />
             <Route path="pantry"        element={<PantryPage />} />
             <Route path="baby"          element={<BabyPage />} />
+            <Route path="thanksgiving"  element={<ThanksgivingPage />} />
             <Route path="brainstorm"    element={<BrainstormPage />} />
             <Route path="brainstorm/:id" element={<BrainstormDetailPage />} />
             <Route path="property"      element={<PropertyPage />} />
