@@ -479,6 +479,28 @@ function runMigrations(db) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_net_worth_snapshots_ws_date ON net_worth_snapshots(workspace, date);
   `);
 
+  // Baby items (registry/wishlist)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS baby_items (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      workspace   TEXT NOT NULL DEFAULT 'us',
+      name        TEXT NOT NULL,
+      link        TEXT DEFAULT NULL,
+      amount      REAL DEFAULT NULL,
+      purchased   INTEGER NOT NULL DEFAULT 0,
+      notes       TEXT DEFAULT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT DEFAULT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_baby_items_user ON baby_items(user_id);
+    CREATE INDEX IF NOT EXISTS idx_baby_items_workspace ON baby_items(workspace);
+    CREATE TRIGGER IF NOT EXISTS baby_items_updated_at
+      AFTER UPDATE ON baby_items FOR EACH ROW
+      BEGIN UPDATE baby_items SET updated_at = datetime('now') WHERE id = OLD.id; END;
+  `);
+
   // Health & Diet
   db.exec(`
     CREATE TABLE IF NOT EXISTS health_meals (
