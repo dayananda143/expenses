@@ -402,7 +402,7 @@ export default function ExpensesPage() {
   const [filterYear, setFilterYear] = useState(initialYear);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [filters, setFilters] = useState({ category_id: initialCategoryId, trip_id: '', search: '' });
+  const [filters, setFilters] = useState({ category_id: initialCategoryId, trip_id: '', is_one_time: '', search: '' });
   const [sort, setSort] = useState('date');
   const [order, setOrder] = useState('desc');
   const [page, setPage] = useState(1);
@@ -461,12 +461,12 @@ export default function ExpensesPage() {
   function handleMonthChange(m, y) { setFilterMonth(m); setFilterYear(y); setPage(1); }
   function clearMonthFilter() { setFilterMonth(null); setPage(1); }
 
-  const hasActiveFilters = filters.search !== '' || filters.category_id !== '' || filters.trip_id !== '' ||
+  const hasActiveFilters = filters.search !== '' || filters.category_id !== '' || filters.trip_id !== '' || filters.is_one_time !== '' ||
     (filterMode === 'range' && (dateFrom || dateTo)) ||
     (filterMode === 'month' && filterMonth !== null && (filterMonth !== now.getMonth() + 1 || filterYear !== now.getFullYear()));
 
   function clearAllFilters() {
-    setFilters({ category_id: '', trip_id: '', search: '' });
+    setFilters({ category_id: '', trip_id: '', is_one_time: '', search: '' });
     setFilterMode('month');
     setFilterMonth(now.getMonth() + 1);
     setFilterYear(now.getFullYear());
@@ -601,6 +601,17 @@ export default function ExpensesPage() {
             }
           </div>
         </div>
+        <button
+          onClick={() => setFilter('is_one_time', filters.is_one_time ? '' : '1')}
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+            filters.is_one_time
+              ? 'bg-amber-500 border-amber-500 text-white'
+              : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
+          title="Show only one-time expenses"
+        >
+          <Sparkles size={13} /> One-time
+        </button>
         {hasActiveFilters && (
           <button
             onClick={clearAllFilters}

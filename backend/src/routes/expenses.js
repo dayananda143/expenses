@@ -6,7 +6,7 @@ const requireWorkspace = require('../middleware/workspace');
 router.use(requireWorkspace);
 
 function buildWhere(query, workspace, userId, isAdmin) {
-  const { category_id, trip_id, date_from, date_to, search, user_id, month, year, type } = query;
+  const { category_id, trip_id, date_from, date_to, search, user_id, month, year, type, is_one_time } = query;
   const where = ['e.workspace = ?'];
   const params = [workspace];
 
@@ -57,6 +57,8 @@ function buildWhere(query, workspace, userId, isAdmin) {
   }
 
   if (type && (type === 'debit' || type === 'credit')) { where.push('e.type = ?'); params.push(type); }
+
+  if (is_one_time === '1' || is_one_time === 'true') { where.push('e.is_one_time = 1'); }
 
   return { whereClause: `WHERE ${where.join(' AND ')}`, params };
 }
