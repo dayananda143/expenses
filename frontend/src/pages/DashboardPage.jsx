@@ -80,6 +80,11 @@ function CategoryPieCard({ title, subtitle, catData, month, year, navigate, fmtR
   const catTotal = catData.reduce((s, c) => s + c.total, 0);
   const active = activeIdx !== null ? catData[activeIdx] : null;
 
+  function goToEntry(entry) {
+    if (entry.id === 'one-time') navigate(`/expenses?month=${month}&year=${year}&is_one_time=1`);
+    else navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`);
+  }
+
   if (catData.length === 0) {
     return (
       <div className={card}>
@@ -121,7 +126,7 @@ function CategoryPieCard({ title, subtitle, catData, month, year, navigate, fmtR
                     fill={entry.color}
                     opacity={activeIdx === null || activeIdx === i ? 1 : 0.2}
                     style={{ cursor: 'pointer', transition: 'opacity 0.15s' }}
-                    onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                    onClick={() => goToEntry(entry)}
                   />
                 ))}
               </Pie>
@@ -152,7 +157,7 @@ function CategoryPieCard({ title, subtitle, catData, month, year, navigate, fmtR
                 style={{ opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.15s' }}
                 onMouseEnter={() => setActiveIdx(i)}
                 onMouseLeave={() => setActiveIdx(null)}
-                onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                onClick={() => goToEntry(entry)}
               >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: entry.color }} />
                 <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{entry.name}</span>
@@ -373,6 +378,9 @@ export default function DashboardPage() {
         const catData = byCategory.filter((c) => c.total > 0);
         const catDataExclOneTime = (byCategoryExclOneTime ?? []).filter((c) => c.total > 0);
         const oneTimeTotal = catData.reduce((s, c) => s + c.total, 0) - catDataExclOneTime.reduce((s, c) => s + c.total, 0);
+        const catDataCombined = oneTimeTotal > 0
+          ? [...catDataExclOneTime, { id: 'one-time', name: 'One-time', color: '#f59e0b', total: oneTimeTotal }]
+          : catDataExclOneTime;
         const weeklyBreakdown = data.weeklyBreakdown ?? [];
         const todayStr = new Date().toISOString().slice(0, 10);
         const currentWeek = weeklyBreakdown.find((w) => w.start <= todayStr && todayStr < w.end);
@@ -515,7 +523,7 @@ export default function DashboardPage() {
 
             {/* By category: with vs without one-time expenses */}
             {oneTimeTotal > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                 <CategoryPieCard
                   title={`${MONTH_NAMES[month - 1]} by Category`}
                   subtitle="Including one-time expenses"
@@ -529,6 +537,15 @@ export default function DashboardPage() {
                   title={`${MONTH_NAMES[month - 1]} by Category`}
                   subtitle={`Excluding one-time expenses (${fmtRound(oneTimeTotal)} removed)`}
                   catData={catDataExclOneTime}
+                  month={month}
+                  year={year}
+                  navigate={navigate}
+                  fmtRound={fmtRound}
+                />
+                <CategoryPieCard
+                  title={`${MONTH_NAMES[month - 1]} by Category`}
+                  subtitle="One-time grouped as its own slice"
+                  catData={catDataCombined}
                   month={month}
                   year={year}
                   navigate={navigate}
