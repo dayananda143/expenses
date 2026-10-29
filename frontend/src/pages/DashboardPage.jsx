@@ -176,6 +176,36 @@ function CategoryPieCard({ title, subtitle, catData, month, year, navigate, fmtR
   );
 }
 
+function CategoryPieSection({ catDataCombined, catDataExclOneTime, oneTimeTotal, month, year, navigate, fmtRound }) {
+  const [hideOneTime, setHideOneTime] = useState(false);
+  const hasOneTime = oneTimeTotal > 0;
+  const data = hasOneTime && hideOneTime ? catDataExclOneTime : catDataCombined;
+
+  return (
+    <CategoryPieCard
+      title={`${MONTH_NAMES[month - 1]} by Category`}
+      subtitle={
+        !hasOneTime ? undefined :
+        hideOneTime ? `Excluding one-time expenses (${fmtRound(oneTimeTotal)} removed)` :
+        'One-time grouped as its own slice'
+      }
+      catData={data}
+      month={month}
+      year={year}
+      navigate={navigate}
+      fmtRound={fmtRound}
+      headerExtra={hasOneTime && (
+        <button
+          onClick={() => setHideOneTime((v) => !v)}
+          className="text-[11px] font-medium px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+        >
+          {hideOneTime ? 'Show one-time' : 'Hide one-time'}
+        </button>
+      )}
+    />
+  );
+}
+
 export default function DashboardPage() {
   const { dark } = useTheme();
   const { workspace, fmtRound } = useWorkspace();
@@ -437,10 +467,10 @@ export default function DashboardPage() {
 
               {/* By category */}
               {catData.length > 0 && (
-                <CategoryPieCard
-                  title={`${MONTH_NAMES[month - 1]} by Category`}
-                  subtitle="Hover to explore"
-                  catData={catData}
+                <CategoryPieSection
+                  catDataCombined={catDataCombined}
+                  catDataExclOneTime={catDataExclOneTime}
+                  oneTimeTotal={oneTimeTotal}
                   month={month}
                   year={year}
                   navigate={navigate}
@@ -448,30 +478,6 @@ export default function DashboardPage() {
                 />
               )}
             </div>
-
-            {/* By category: without one-time expenses, and one-time grouped as its own slice */}
-            {oneTimeTotal > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <CategoryPieCard
-                  title={`${MONTH_NAMES[month - 1]} by Category`}
-                  subtitle={`Excluding one-time expenses (${fmtRound(oneTimeTotal)} removed)`}
-                  catData={catDataExclOneTime}
-                  month={month}
-                  year={year}
-                  navigate={navigate}
-                  fmtRound={fmtRound}
-                />
-                <CategoryPieCard
-                  title={`${MONTH_NAMES[month - 1]} by Category`}
-                  subtitle="One-time grouped as its own slice"
-                  catData={catDataCombined}
-                  month={month}
-                  year={year}
-                  navigate={navigate}
-                  fmtRound={fmtRound}
-                />
-              </div>
-            )}
 
             {/* Weekly Spending */}
             {weeklyBreakdown.length > 0 && (
