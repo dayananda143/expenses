@@ -288,15 +288,15 @@ router.get('/:id', (req, res, next) => {
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { category_id, amount, date, description, notes, type, is_recurring, subtype } = req.body;
+    const { category_id, amount, date, description, notes, type, is_recurring, is_one_time, subtype } = req.body;
     if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const txType = type === 'credit' ? 'credit' : 'debit';
     const descValue = description?.trim() || null;
 
     const result = db.prepare(
-      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring, subtype) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(req.user.id, category_id ?? null, parseFloat(amount), date, descValue, notes ?? null, req.workspace, txType, is_recurring ? 1 : 0, subtype?.trim() || null);
+      'INSERT INTO expenses (user_id, category_id, amount, date, description, notes, workspace, type, is_recurring, subtype, is_one_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(req.user.id, category_id ?? null, parseFloat(amount), date, descValue, notes ?? null, req.workspace, txType, is_recurring ? 1 : 0, subtype?.trim() || null, is_one_time ? 1 : 0);
 
     const row = db.prepare(`
       SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon
@@ -317,14 +317,14 @@ router.put('/:id', (req, res, next) => {
     ).get(req.params.id, req.workspace, req.user.id, req.user.is_admin ? 1 : 0);
     if (!existing) return res.status(404).json({ error: 'Expense not found' });
 
-    const { category_id, amount, date, description, notes, type, is_recurring, subtype } = req.body;
+    const { category_id, amount, date, description, notes, type, is_recurring, is_one_time, subtype } = req.body;
     if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const txType = type === 'credit' ? 'credit' : 'debit';
 
     db.prepare(
-      'UPDATE expenses SET category_id=?, amount=?, date=?, description=?, notes=?, type=?, is_recurring=?, subtype=? WHERE id=?'
-    ).run(category_id ?? null, parseFloat(amount), date, description?.trim() || null, notes ?? null, txType, is_recurring ? 1 : 0, subtype?.trim() || null, existing.id);
+      'UPDATE expenses SET category_id=?, amount=?, date=?, description=?, notes=?, type=?, is_recurring=?, subtype=?, is_one_time=? WHERE id=?'
+    ).run(category_id ?? null, parseFloat(amount), date, description?.trim() || null, notes ?? null, txType, is_recurring ? 1 : 0, subtype?.trim() || null, is_one_time ? 1 : 0, existing.id);
 
     const row = db.prepare(`
       SELECT e.*, c.name AS category_name, c.color AS category_color, c.icon AS category_icon

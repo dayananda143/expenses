@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, Tag, Navigation, MapPin, FilterX } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Download, Upload, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, RefreshCw, CalendarRange, Utensils, Car, ShoppingBag, Film, HeartPulse, Zap, Home, BookOpen, Plane, Circle, Coffee, Music, Gamepad2, Dumbbell, Baby, Gift, PawPrint, Briefcase, Smartphone, Shirt, Tag, Navigation, MapPin, FilterX, Sparkles } from 'lucide-react';
 
 const ICON_MAP = {
   'utensils': Utensils, 'car': Car, 'shopping-bag': ShoppingBag, 'film': Film,
@@ -76,8 +76,8 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: expense
-      ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', subtype: expense.subtype ?? '', notes: expense.notes ?? '', is_recurring: !!expense.is_recurring }
-      : { date: new Date().toLocaleDateString('en-CA'), is_recurring: false, subtype: '' },
+      ? { description: expense.description, amount: expense.amount, date: expense.date, category_id: expense.category_id ?? '', subtype: expense.subtype ?? '', notes: expense.notes ?? '', is_recurring: !!expense.is_recurring, is_one_time: !!expense.is_one_time }
+      : { date: new Date().toLocaleDateString('en-CA'), is_recurring: false, is_one_time: false, subtype: '' },
   });
 
   const [showAddCat, setShowAddCat] = useState(false);
@@ -131,7 +131,7 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
 
   async function onSubmit(data) {
     try {
-      const payload = { ...data, amount: parseFloat(data.amount), category_id: data.category_id || null, subtype: data.subtype?.trim() || null, is_recurring: data.is_recurring ? 1 : 0 };
+      const payload = { ...data, amount: parseFloat(data.amount), category_id: data.category_id || null, subtype: data.subtype?.trim() || null, is_recurring: data.is_recurring ? 1 : 0, is_one_time: data.is_one_time ? 1 : 0 };
       if (isEdit) { await update.mutateAsync({ id: expense.id, ...payload }); toast('Expense updated'); }
       else        { await create.mutateAsync(payload); toast('Expense added'); }
       onClose(data.date);
@@ -267,6 +267,13 @@ function ExpenseModal({ expense, categories, subtypesByCategory, onClose }) {
                 <input type="checkbox" {...register('is_recurring')} className="w-4 h-4 rounded accent-emerald-600" />
                 <span className="text-sm text-gray-700 dark:text-gray-300">Repeat monthly</span>
                 <span className="text-xs text-gray-400 dark:text-gray-500">(use as a recurring template)</span>
+              </label>
+            </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" {...register('is_one_time')} className="w-4 h-4 rounded accent-amber-600" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">One-time expense</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">(a single unusual purchase, not part of your regular spending)</span>
               </label>
             </div>
           </div>
@@ -689,6 +696,11 @@ export default function ExpensesPage() {
                             {!!e.is_recurring && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" title="Recurring template">
                                 <RefreshCw size={10} /> recurring
+                              </span>
+                            )}
+                            {!!e.is_one_time && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" title="One-time expense">
+                                <Sparkles size={10} /> one-time
                               </span>
                             )}
                             {e.trip_id && (() => { const t = trips.find((tr) => tr.id === e.trip_id); return t ? (
