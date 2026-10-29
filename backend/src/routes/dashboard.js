@@ -66,6 +66,16 @@ router.get('/', (req, res, next) => {
       ORDER BY c.sort_order ASC, c.name ASC
     `).all(...expUserParams, ws, monthStart, monthEnd, ...catUserParams, ws);
 
+    // Spending by category for selected month, excluding one-time expenses
+    const byCategoryExclOneTime = db.prepare(`
+      SELECT c.id, c.name, c.color, c.icon, COALESCE(SUM(e.amount), 0) AS total
+      FROM categories c
+      LEFT JOIN expenses e ON e.category_id = c.id AND ${expEUserWhere} AND e.workspace = ? AND e.date >= ? AND e.date < ? AND e.is_one_time = 0
+      WHERE ${catCUserWhere} AND c.workspace = ?
+      GROUP BY c.id
+      ORDER BY c.sort_order ASC, c.name ASC
+    `).all(...expUserParams, ws, monthStart, monthEnd, ...catUserParams, ws);
+
     // Monthly spending for surrounding 12 months
     const monthly = db.prepare(`
       SELECT strftime('%Y-%m', date) AS month, COALESCE(SUM(amount), 0) AS total
@@ -190,6 +200,7 @@ router.get('/', (req, res, next) => {
       monthTotal,
       yearTotal,
       byCategory,
+      byCategoryExclOneTime,
       monthly,
       recent,
       budgetStatus,

@@ -75,6 +75,99 @@ function MonthNav({ year, month, onChange }) {
   );
 }
 
+function CategoryPieCard({ title, subtitle, catData, month, year, navigate, fmtRound }) {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const catTotal = catData.reduce((s, c) => s + c.total, 0);
+  const active = activeIdx !== null ? catData[activeIdx] : null;
+
+  if (catData.length === 0) {
+    return (
+      <div className={card}>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{title}</h2>
+        <p className="text-xs text-gray-400 dark:text-gray-500 py-10 text-center">No expenses here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={card}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{title}</h2>
+          {subtitle && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{subtitle}</p>}
+        </div>
+        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{fmtRound(catTotal)}</span>
+      </div>
+      <div className="flex gap-5 items-center">
+        {/* Donut */}
+        <div className="relative shrink-0 w-32 h-32">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={catData}
+                dataKey="total"
+                cx="50%"
+                cy="50%"
+                innerRadius={38}
+                outerRadius={56}
+                paddingAngle={2}
+                strokeWidth={0}
+                onMouseEnter={(_, i) => setActiveIdx(i)}
+                onMouseLeave={() => setActiveIdx(null)}
+              >
+                {catData.map((entry, i) => (
+                  <Cell
+                    key={entry.id}
+                    fill={entry.color}
+                    opacity={activeIdx === null || activeIdx === i ? 1 : 0.2}
+                    style={{ cursor: 'pointer', transition: 'opacity 0.15s' }}
+                    onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+                  />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-2">
+            {active ? (
+              <>
+                <p className="text-[10px] font-bold text-gray-900 dark:text-white leading-tight truncate max-w-[76px]">{active.name}</p>
+                <p className="text-xs font-bold leading-tight" style={{ color: active.color }}>
+                  {catTotal > 0 ? Math.round((active.total / catTotal) * 1000) / 10 : 0}%
+                </p>
+              </>
+            ) : (
+              <p className="text-[10px] text-gray-400">{catData.length} categories</p>
+            )}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex-1 min-w-0 grid grid-cols-1 gap-y-1 max-h-32 overflow-y-auto">
+          {catData.map((entry, i) => {
+            const dimmed = activeIdx !== null && activeIdx !== i;
+            return (
+              <div
+                key={entry.id}
+                className="flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer min-w-0"
+                style={{ opacity: dimmed ? 0.3 : 1, transition: 'opacity 0.15s' }}
+                onMouseEnter={() => setActiveIdx(i)}
+                onMouseLeave={() => setActiveIdx(null)}
+                onClick={() => navigate(`/expenses?month=${month}&year=${year}&category_id=${entry.id}`)}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: entry.color }} />
+                <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{entry.name}</span>
+                <span className="text-[10px] text-gray-400 ml-auto shrink-0">
+                  {catTotal > 0 ? Math.round((entry.total / catTotal) * 1000) / 10 : 0}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { dark } = useTheme();
   const { workspace, fmtRound } = useWorkspace();
@@ -138,7 +231,7 @@ export default function DashboardPage() {
       {error && <ErrorMessage message={error?.error} />}
 
       {data && (() => {
-        const { monthTotal, yearTotal, byCategory, monthly, recent, budgetStatus } = data;
+        const { monthTotal, yearTotal, byCategory, byCategoryExclOneTime, monthly, recent, budgetStatus } = data;
 
         if (workspace === 'india') {
           const balance = (data.allTimeCredit ?? 0) - (data.allTimeDebit ?? 0);
@@ -278,6 +371,8 @@ export default function DashboardPage() {
         }
 
         const catData = byCategory.filter((c) => c.total > 0);
+        const catDataExclOneTime = (byCategoryExclOneTime ?? []).filter((c) => c.total > 0);
+        const oneTimeTotal = catData.reduce((s, c) => s + c.total, 0) - catDataExclOneTime.reduce((s, c) => s + c.total, 0);
         const weeklyBreakdown = data.weeklyBreakdown ?? [];
         const todayStr = new Date().toISOString().slice(0, 10);
         const currentWeek = weeklyBreakdown.find((w) => w.start <= todayStr && todayStr < w.end);
@@ -417,6 +512,30 @@ export default function DashboardPage() {
                 );
               })()}
             </div>
+
+            {/* By category: with vs without one-time expenses */}
+            {oneTimeTotal > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <CategoryPieCard
+                  title={`${MONTH_NAMES[month - 1]} by Category`}
+                  subtitle="Including one-time expenses"
+                  catData={catData}
+                  month={month}
+                  year={year}
+                  navigate={navigate}
+                  fmtRound={fmtRound}
+                />
+                <CategoryPieCard
+                  title={`${MONTH_NAMES[month - 1]} by Category`}
+                  subtitle={`Excluding one-time expenses (${fmtRound(oneTimeTotal)} removed)`}
+                  catData={catDataExclOneTime}
+                  month={month}
+                  year={year}
+                  navigate={navigate}
+                  fmtRound={fmtRound}
+                />
+              </div>
+            )}
 
             {/* Weekly Spending */}
             {weeklyBreakdown.length > 0 && (
