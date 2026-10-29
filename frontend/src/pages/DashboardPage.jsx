@@ -521,18 +521,9 @@ export default function DashboardPage() {
               })()}
             </div>
 
-            {/* By category: with vs without one-time expenses */}
+            {/* By category: without one-time expenses, and one-time grouped as its own slice */}
             {oneTimeTotal > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                <CategoryPieCard
-                  title={`${MONTH_NAMES[month - 1]} by Category`}
-                  subtitle="Including one-time expenses"
-                  catData={catData}
-                  month={month}
-                  year={year}
-                  navigate={navigate}
-                  fmtRound={fmtRound}
-                />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <CategoryPieCard
                   title={`${MONTH_NAMES[month - 1]} by Category`}
                   subtitle={`Excluding one-time expenses (${fmtRound(oneTimeTotal)} removed)`}
