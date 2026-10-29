@@ -150,7 +150,7 @@ function CategoryPieCard({ title, subtitle, catData, month, year, navigate, fmtR
         </div>
 
         {/* Legend */}
-        <div className="flex-1 min-w-0 grid grid-cols-1 gap-y-1 max-h-32 overflow-y-auto">
+        <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-1">
           {catData.map((entry, i) => {
             const dimmed = activeIdx !== null && activeIdx !== i;
             return (
