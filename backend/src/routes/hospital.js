@@ -64,7 +64,7 @@ router.delete('/categories/:cid', (req, res, next) => {
 // GET /api/hospital-expenses
 router.get('/', (req, res, next) => {
   try {
-    const { month, year, search, page = 1, limit: limitQ = 25, user_id, category_id, needs_review, sort, order } = req.query;
+    const { month, year, search, page = 1, limit: limitQ = 25, user_id, category_id, needs_review, not_billable, sort, order } = req.query;
     const SORT_COLS = { date: 'h.date', description: 'h.description', hospital: 'h.hospital', amount: 'h.amount' };
     const sortCol   = SORT_COLS[sort] ?? 'h.date';
     const sortDir   = order === 'asc' ? 'ASC' : 'DESC';
@@ -97,6 +97,9 @@ router.get('/', (req, res, next) => {
     if (needs_review === '1' || needs_review === 'true') {
       where += ' AND h.needs_review = 1';
     }
+    if (not_billable === '1' || not_billable === 'true') {
+      where += ' AND h.not_billable = 1';
+    }
 
     const total = db.prepare(`SELECT COUNT(*) AS n FROM hospital_expenses h WHERE ${where}`).get(...params).n;
 
@@ -119,7 +122,7 @@ router.get('/', (req, res, next) => {
 router.post('/', (req, res, next) => {
   if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { description, amount, date, hospital, notes, assigned_to, category_id, needs_review } = req.body;
+    const { description, amount, date, hospital, notes, assigned_to, category_id, needs_review, not_billable } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
@@ -134,8 +137,8 @@ router.post('/', (req, res, next) => {
     const catId = category_id ? parseInt(category_id) : null;
 
     const result = db.prepare(
-      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes, category_id, needs_review) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, needs_review ? 1 : 0);
+      'INSERT INTO hospital_expenses (user_id, description, amount, date, hospital, notes, category_id, needs_review, not_billable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, needs_review ? 1 : 0, not_billable ? 1 : 0);
 
     const row = db.prepare(
       `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color
@@ -155,7 +158,7 @@ router.put('/:id', (req, res, next) => {
     const row = db.prepare('SELECT * FROM hospital_expenses WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    const { description, amount, date, hospital, notes, assigned_to, category_id, needs_review } = req.body;
+    const { description, amount, date, hospital, notes, assigned_to, category_id, needs_review, not_billable } = req.body;
     if (!description?.trim()) return res.status(400).json({ error: 'description is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     const parsedAmount = (amount != null && amount !== '') ? parseFloat(amount) : null;
@@ -170,8 +173,8 @@ router.put('/:id', (req, res, next) => {
     const catId = category_id ? parseInt(category_id) : null;
 
     db.prepare(
-      'UPDATE hospital_expenses SET user_id = ?, description = ?, amount = ?, date = ?, hospital = ?, notes = ?, category_id = ?, needs_review = ? WHERE id = ?'
-    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, needs_review ? 1 : 0, row.id);
+      'UPDATE hospital_expenses SET user_id = ?, description = ?, amount = ?, date = ?, hospital = ?, notes = ?, category_id = ?, needs_review = ?, not_billable = ? WHERE id = ?'
+    ).run(targetUserId, description.trim(), parsedAmount, date, hospital?.trim() ?? null, notes?.trim() ?? null, catId, needs_review ? 1 : 0, not_billable ? 1 : 0, row.id);
 
     const updated = db.prepare(
       `SELECT h.*, u.username, hc.name AS category_name, hc.color AS category_color
@@ -267,11 +270,11 @@ router.get('/dashboard', (req, res, next) => {
 // GET /api/hospital-expenses/summary
 router.get('/summary', (req, res, next) => {
   try {
-    const { year, user_id, category_id, search, needs_review } = req.query;
+    const { year, user_id, category_id, search, needs_review, not_billable } = req.query;
     const yearParam = year ?? new Date().getFullYear().toString();
 
     // Everyone with hospital_access sees all records; admin can filter by user_id.
-    // Also respects the same category/search/needs-review filters as the list view.
+    // Also respects the same category/search/needs-review/not-billable filters as the list view.
     let scopeWhere = '1=1';
     const scopeParams = [];
     if (user_id && req.user.is_admin) {
@@ -290,9 +293,16 @@ router.get('/summary', (req, res, next) => {
     if (needs_review === '1' || needs_review === 'true') {
       scopeWhere += ' AND needs_review = 1';
     }
+    if (not_billable === '1' || not_billable === 'true') {
+      scopeWhere += ' AND not_billable = 1';
+    }
 
     const yearTotal = db.prepare(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM hospital_expenses WHERE ${scopeWhere} AND strftime('%Y', date) = ?`
+    ).get(...scopeParams, yearParam).total;
+
+    const yearNotBillable = db.prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM hospital_expenses WHERE ${scopeWhere} AND not_billable = 1 AND strftime('%Y', date) = ?`
     ).get(...scopeParams, yearParam).total;
 
     const monthly = db.prepare(
@@ -303,7 +313,15 @@ router.get('/summary', (req, res, next) => {
       `SELECT COALESCE(SUM(amount), 0) AS total FROM hospital_expenses WHERE ${scopeWhere}`
     ).get(...scopeParams).total;
 
-    res.json({ yearTotal, allTime, monthly, year: yearParam });
+    const allTimeNotBillable = db.prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM hospital_expenses WHERE ${scopeWhere} AND not_billable = 1`
+    ).get(...scopeParams).total;
+
+    res.json({
+      yearTotal, allTime, monthly, year: yearParam,
+      yearBillable: yearTotal - yearNotBillable, yearNotBillable,
+      allTimeBillable: allTime - allTimeNotBillable, allTimeNotBillable,
+    });
   } catch (err) {
     next(err);
   }
@@ -341,7 +359,7 @@ router.get('/export/csv', (req, res, next) => {
     ).all(...params);
 
     const lines = [
-      'date,description,amount,hospital,notes,assigned_to',
+      'date,description,amount,hospital,notes,assigned_to,not_billable',
       ...rows.map((r) => [
         r.date,
         `"${(r.description ?? '').replace(/"/g, '""')}"`,
@@ -349,6 +367,7 @@ router.get('/export/csv', (req, res, next) => {
         `"${(r.hospital ?? '').replace(/"/g, '""')}"`,
         `"${(r.notes ?? '').replace(/"/g, '""')}"`,
         `"${(r.username ?? '').replace(/"/g, '""')}"`,
+        r.not_billable ? 'yes' : 'no',
       ].join(',')),
     ];
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload, FilterX, Flag } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, HeartPulse, DollarSign, User, Download, Upload, FilterX, Flag, Ban } from 'lucide-react';
 import Papa from 'papaparse';
 import {
   useHospitalExpenses,
@@ -106,8 +106,9 @@ function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose })
           assigned_to: expense.user_id ?? '',
           category_id: expense.category_id ?? '',
           needs_review: !!expense.needs_review,
+          not_billable: !!expense.not_billable,
         }
-      : { date: new Date().toLocaleDateString('en-CA'), assigned_to: '', category_id: '', needs_review: false },
+      : { date: new Date().toLocaleDateString('en-CA'), assigned_to: '', category_id: '', needs_review: false, not_billable: false },
   });
 
   const [showAddCat, setShowAddCat] = useState(false);
@@ -145,6 +146,7 @@ function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose })
         assigned_to: data.assigned_to ? parseInt(data.assigned_to) : undefined,
         category_id: data.category_id || null,
         needs_review: !!data.needs_review,
+        not_billable: !!data.not_billable,
       };
       if (isEdit) { await update.mutateAsync({ id: expense.id, ...payload }); toast('Expense updated'); }
       else        { await create.mutateAsync(payload); toast('Expense added'); }
@@ -268,6 +270,10 @@ function HospitalModal({ expense, hospitalUsers, categories, isAdmin, onClose })
             <input type="checkbox" {...register('needs_review')} className="rounded border-gray-300 dark:border-gray-600 text-rose-600 focus:ring-rose-500" />
             Flag for review
           </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <input type="checkbox" {...register('not_billable')} className="rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500" />
+            Not billable to insurance
+          </label>
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="flex-1 bg-rose-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-rose-700 disabled:opacity-50 transition-colors">
@@ -295,6 +301,7 @@ export default function HospitalPage() {
   const [filterUser, setFilterUser] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [needsReview, setNeedsReview] = useState(false);
+  const [notBillable, setNotBillable] = useState(false);
   const [page, setPage]     = useState(1);
   const [limit, setLimit]   = useState(10);
   const [sort, setSort]     = useState('date');
@@ -325,13 +332,15 @@ export default function HospitalPage() {
     user_id: isAdmin && filterUser ? filterUser : undefined,
     category_id: filterCategory || undefined,
     needs_review: needsReview || undefined,
+    not_billable: notBillable || undefined,
   });
   const { data: summary } = useHospitalSummary(
     year,
     isAdmin && filterUser ? filterUser : undefined,
     filterCategory || undefined,
     search || undefined,
-    needsReview || undefined
+    needsReview || undefined,
+    notBillable || undefined
   );
   const del = useDeleteHospitalExpense();
 
@@ -442,10 +451,20 @@ export default function HospitalPage() {
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">This Year ({year})</p>
             <p className="text-xl font-bold text-rose-600 dark:text-rose-400">{fmt(summary.yearTotal)}</p>
+            {summary.yearNotBillable > 0 && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                {fmt(summary.yearBillable)} billable · <span className="text-amber-600 dark:text-amber-400">{fmt(summary.yearNotBillable)} not billable</span>
+              </p>
+            )}
           </div>
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">All Time</p>
             <p className="text-xl font-bold text-gray-800 dark:text-gray-100">{fmt(summary.allTime)}</p>
+            {summary.allTimeNotBillable > 0 && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                {fmt(summary.allTimeBillable)} billable · <span className="text-amber-600 dark:text-amber-400">{fmt(summary.allTimeNotBillable)} not billable</span>
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -503,9 +522,19 @@ export default function HospitalPage() {
         >
           <Flag size={13} /> Needs review
         </button>
-        {(dateMode !== 'all' || filterCategory !== '' || filterUser !== '' || search !== '' || needsReview) && (
+        <button
+          onClick={() => { setNotBillable((v) => !v); setPage(1); }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors shrink-0 ${
+            notBillable
+              ? 'bg-amber-500 border-amber-500 text-white'
+              : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
+        >
+          <Ban size={13} /> Not billable
+        </button>
+        {(dateMode !== 'all' || filterCategory !== '' || filterUser !== '' || search !== '' || needsReview || notBillable) && (
           <button
-            onClick={() => { setDateMode('all'); setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setNeedsReview(false); setPage(1); }}
+            onClick={() => { setDateMode('all'); setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setNeedsReview(false); setNotBillable(false); setPage(1); }}
             title="Clear all filters"
             className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
           >
@@ -556,7 +585,14 @@ export default function HospitalPage() {
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{row.date}</td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800 dark:text-gray-200">{row.description}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-gray-800 dark:text-gray-200">{row.description}</p>
+                        {!!row.not_billable && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400" title="Not billable to insurance">
+                            <Ban size={10} /> not billable
+                          </span>
+                        )}
+                      </div>
                       {row.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{row.notes}</p>}
                     </td>
                     <td className="px-4 py-3">

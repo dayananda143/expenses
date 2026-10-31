@@ -3,9 +3,9 @@ import client from '../api/client';
 
 const BASE = '/hospital-expenses';
 
-export function useHospitalExpenses({ month, year, search, page, limit, user_id, category_id, needs_review, sort, order } = {}) {
+export function useHospitalExpenses({ month, year, search, page, limit, user_id, category_id, needs_review, not_billable, sort, order } = {}) {
   return useQuery({
-    queryKey: ['hospital-expenses', { month, year, search, page, limit, user_id, category_id, needs_review, sort, order }],
+    queryKey: ['hospital-expenses', { month, year, search, page, limit, user_id, category_id, needs_review, not_billable, sort, order }],
     queryFn: () => {
       const params = new URLSearchParams();
       if (month)       params.set('month', month);
@@ -16,6 +16,7 @@ export function useHospitalExpenses({ month, year, search, page, limit, user_id,
       if (user_id)     params.set('user_id', user_id);
       if (category_id) params.set('category_id', category_id);
       if (needs_review) params.set('needs_review', '1');
+      if (not_billable) params.set('not_billable', '1');
       if (sort)        params.set('sort', sort);
       if (order)       params.set('order', order);
       return client.get(`${BASE}?${params.toString()}`);
@@ -57,9 +58,9 @@ export function useDeleteHospitalCategory() {
   });
 }
 
-export function useHospitalSummary(year, user_id, category_id, search, needs_review) {
+export function useHospitalSummary(year, user_id, category_id, search, needs_review, not_billable) {
   return useQuery({
-    queryKey: ['hospital-summary', year, user_id, category_id, search, needs_review],
+    queryKey: ['hospital-summary', year, user_id, category_id, search, needs_review, not_billable],
     queryFn: () => {
       const params = new URLSearchParams();
       if (year)         params.set('year', year);
@@ -67,6 +68,7 @@ export function useHospitalSummary(year, user_id, category_id, search, needs_rev
       if (category_id)  params.set('category_id', category_id);
       if (search)       params.set('search', search);
       if (needs_review) params.set('needs_review', '1');
+      if (not_billable) params.set('not_billable', '1');
       return client.get(`${BASE}/summary?${params.toString()}`);
     },
   });
