@@ -35,36 +35,55 @@ function SortIcon({ field, sort, order }) {
     : <ChevronDown size={13} className="text-rose-500" />;
 }
 
-function MonthYearPicker({ month, year, onChange, onClear }) {
+function MonthYearPicker({ mode, month, year, onModeChange, onChange }) {
   const now = new Date();
+
   function prev() {
-    if (month === null) { onChange(now.getMonth() + 1, now.getFullYear()); return; }
+    if (mode === 'year') { onChange(null, year - 1); return; }
     if (month === 1) onChange(12, year - 1);
     else onChange(month - 1, year);
   }
   function next() {
-    if (month === null) { onChange(now.getMonth() + 1, now.getFullYear()); return; }
+    if (mode === 'year') { onChange(null, year + 1); return; }
     if (month === 12) onChange(1, year + 1);
     else onChange(month + 1, year);
   }
+
+  function selectMode(nextMode) {
+    if (nextMode === 'all') { onModeChange('all'); return; }
+    if (nextMode === 'year') { onModeChange('year'); onChange(null, year); return; }
+    onModeChange('month'); onChange(month ?? now.getMonth() + 1, year);
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      <button onClick={prev} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-        <ChevronLeft size={14} />
-      </button>
-      <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 min-w-[110px] justify-between">
-        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-          {month !== null ? `${MONTHS[month - 1]} ${year}` : 'All time'}
-        </span>
-        {month !== null && (
-          <button onClick={onClear} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-1">
-            <X size={12} />
+    <div className="flex items-center gap-1.5">
+      <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden text-xs font-medium">
+        {[['all', 'All'], ['year', 'Year'], ['month', 'Month']].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => selectMode(key)}
+            className={`px-2.5 py-1.5 transition-colors ${mode === key ? 'bg-rose-600 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+          >
+            {label}
           </button>
-        )}
+        ))}
       </div>
-      <button onClick={next} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-        <ChevronRight size={14} />
-      </button>
+
+      {mode !== 'all' && (
+        <div className="flex items-center gap-1">
+          <button onClick={prev} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <ChevronLeft size={14} />
+          </button>
+          <div className="flex items-center px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 min-w-[80px] justify-center">
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              {mode === 'month' ? `${MONTHS[month - 1]} ${year}` : year}
+            </span>
+          </div>
+          <button onClick={next} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -269,6 +288,7 @@ export default function HospitalPage() {
   const fileRef = useRef(null);
 
   const now = new Date();
+  const [dateMode, setDateMode] = useState('all'); // 'all' | 'year' | 'month'
   const [month, setMonth]   = useState(null);
   const [year, setYear]     = useState(now.getFullYear());
   const [search, setSearch] = useState('');
@@ -295,8 +315,8 @@ export default function HospitalPage() {
   const categories = catsData?.data ?? [];
 
   const { data, isLoading, error } = useHospitalExpenses({
-    month: month ?? undefined,
-    year: month ? year : undefined,
+    month: dateMode === 'month' ? month ?? undefined : undefined,
+    year: dateMode === 'month' || dateMode === 'year' ? year : undefined,
     search: search || undefined,
     page,
     limit,
@@ -321,7 +341,8 @@ export default function HospitalPage() {
 
   function handleExport() {
     const qp = {};
-    if (month) { qp.month = month; qp.year = year; } else if (year) { qp.year = year; }
+    if (dateMode === 'month') { qp.month = month; qp.year = year; }
+    else if (dateMode === 'year') { qp.year = year; }
     if (search) qp.search = search;
     if (isAdmin && filterUser) qp.user_id = filterUser;
     const queryStr = new URLSearchParams(qp).toString();
@@ -432,10 +453,11 @@ export default function HospitalPage() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <MonthYearPicker
+          mode={dateMode}
           month={month}
           year={year}
+          onModeChange={(m) => { setDateMode(m); setPage(1); }}
           onChange={(m, y) => { setMonth(m); setYear(y); setPage(1); }}
-          onClear={() => { setMonth(null); setPage(1); }}
         />
         {categories.length > 0 && (
           <select
@@ -481,9 +503,9 @@ export default function HospitalPage() {
         >
           <Flag size={13} /> Needs review
         </button>
-        {(month !== null || filterCategory !== '' || filterUser !== '' || search !== '' || needsReview) && (
+        {(dateMode !== 'all' || filterCategory !== '' || filterUser !== '' || search !== '' || needsReview) && (
           <button
-            onClick={() => { setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setNeedsReview(false); setPage(1); }}
+            onClick={() => { setDateMode('all'); setMonth(null); setFilterCategory(''); setFilterUser(''); setSearch(''); setNeedsReview(false); setPage(1); }}
             title="Clear all filters"
             className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
           >
