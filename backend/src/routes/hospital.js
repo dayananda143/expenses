@@ -267,12 +267,29 @@ router.get('/dashboard', (req, res, next) => {
 // GET /api/hospital-expenses/summary
 router.get('/summary', (req, res, next) => {
   try {
-    const { year, user_id } = req.query;
+    const { year, user_id, category_id, search, needs_review } = req.query;
     const yearParam = year ?? new Date().getFullYear().toString();
 
-    // Everyone with hospital_access sees all records; admin can filter by user_id
-    const scopeWhere  = user_id && req.user.is_admin ? 'user_id = ?' : '1=1';
-    const scopeParams = user_id && req.user.is_admin ? [user_id] : [];
+    // Everyone with hospital_access sees all records; admin can filter by user_id.
+    // Also respects the same category/search/needs-review filters as the list view.
+    let scopeWhere = '1=1';
+    const scopeParams = [];
+    if (user_id && req.user.is_admin) {
+      scopeWhere += ' AND user_id = ?';
+      scopeParams.push(user_id);
+    }
+    if (category_id) {
+      scopeWhere += ' AND category_id = ?';
+      scopeParams.push(category_id);
+    }
+    if (search) {
+      scopeWhere += ' AND (description LIKE ? OR hospital LIKE ? OR notes LIKE ? OR CAST(amount AS TEXT) LIKE ?)';
+      const s = `%${search}%`;
+      scopeParams.push(s, s, s, s);
+    }
+    if (needs_review === '1' || needs_review === 'true') {
+      scopeWhere += ' AND needs_review = 1';
+    }
 
     const yearTotal = db.prepare(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM hospital_expenses WHERE ${scopeWhere} AND strftime('%Y', date) = ?`

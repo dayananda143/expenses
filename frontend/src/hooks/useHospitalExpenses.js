@@ -57,13 +57,16 @@ export function useDeleteHospitalCategory() {
   });
 }
 
-export function useHospitalSummary(year, user_id) {
+export function useHospitalSummary(year, user_id, category_id, search, needs_review) {
   return useQuery({
-    queryKey: ['hospital-summary', year, user_id],
+    queryKey: ['hospital-summary', year, user_id, category_id, search, needs_review],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (year)    params.set('year', year);
-      if (user_id) params.set('user_id', user_id);
+      if (year)         params.set('year', year);
+      if (user_id)      params.set('user_id', user_id);
+      if (category_id)  params.set('category_id', category_id);
+      if (search)       params.set('search', search);
+      if (needs_review) params.set('needs_review', '1');
       return client.get(`${BASE}/summary?${params.toString()}`);
     },
   });

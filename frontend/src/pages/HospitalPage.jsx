@@ -306,7 +306,13 @@ export default function HospitalPage() {
     category_id: filterCategory || undefined,
     needs_review: needsReview || undefined,
   });
-  const { data: summary } = useHospitalSummary(year, isAdmin && filterUser ? filterUser : undefined);
+  const { data: summary } = useHospitalSummary(
+    year,
+    isAdmin && filterUser ? filterUser : undefined,
+    filterCategory || undefined,
+    search || undefined,
+    needsReview || undefined
+  );
   const del = useDeleteHospitalExpense();
 
   const rows  = data?.data ?? [];
