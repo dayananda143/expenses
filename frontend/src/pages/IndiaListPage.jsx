@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, ShoppingBag, Package, Check, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, ShoppingBag, Package, Check, MapPin, Globe, Baby } from 'lucide-react';
 import {
   useIndiaList, useCreateIndiaListItem, useUpdateIndiaListItem,
   useToggleIndiaListItem, useDeleteIndiaListItem, useReorderIndiaList,
@@ -14,6 +14,8 @@ const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded-lg 
 const TYPE_OPTIONS = [
   { value: 'buy',    label: 'Buy in India',   icon: ShoppingBag, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20' },
   { value: 'parcel', label: 'Parcel to US',   icon: Package,     color: 'text-blue-600 dark:text-blue-400',    bg: 'bg-blue-50 dark:bg-blue-900/20'    },
+  { value: 'online', label: 'Online',         icon: Globe,       color: 'text-teal-600 dark:text-teal-400',    bg: 'bg-teal-50 dark:bg-teal-900/20'    },
+  { value: 'baby',   label: 'Baby',           icon: Baby,        color: 'text-pink-600 dark:text-pink-400',    bg: 'bg-pink-50 dark:bg-pink-900/20'    },
 ];
 
 function getTypeConfig(type) {
@@ -127,6 +129,8 @@ export default function IndiaListPage() {
     if (locationFilter && i.location !== locationFilter) return false;
     if (filter === 'buy')     return i.type === 'buy'    && !i.done;
     if (filter === 'parcel')  return i.type === 'parcel' && !i.done;
+    if (filter === 'online')  return i.type === 'online' && !i.done;
+    if (filter === 'baby')    return i.type === 'baby'   && !i.done;
     if (filter === 'pending') return !i.done;
     if (filter === 'done')    return !!i.done;
     return true;
@@ -179,6 +183,8 @@ export default function IndiaListPage() {
     { key: 'pending', label: 'Pending' },
     { key: 'buy',     label: 'Buy' },
     { key: 'parcel',  label: 'Parcel' },
+    { key: 'online',  label: 'Online' },
+    { key: 'baby',    label: 'Baby' },
     { key: 'done',    label: 'Done' },
   ];
 
