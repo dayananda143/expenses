@@ -120,7 +120,7 @@ export default function IndiaListPage() {
   const [editItem, setEditItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
-  const [filter, setFilter] = useState('all'); // all | buy | parcel | pending | done
+  const [filter, setFilter] = useState('pending'); // all | buy | parcel | pending | done
   const [locationFilter, setLocationFilter] = useState(''); // '' | TN | AP
   const dragId = useRef(null);
 
