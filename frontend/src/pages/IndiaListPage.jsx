@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, ShoppingBag, Package, Check, MapPin, Globe, Baby } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, ShoppingBag, Package, Check, MapPin, Globe, Baby, Utensils } from 'lucide-react';
 import {
   useIndiaList, useCreateIndiaListItem, useUpdateIndiaListItem,
   useToggleIndiaListItem, useDeleteIndiaListItem, useReorderIndiaList,
@@ -16,6 +16,7 @@ const TYPE_OPTIONS = [
   { value: 'parcel', label: 'Parcel to US',   icon: Package,     color: 'text-blue-600 dark:text-blue-400',    bg: 'bg-blue-50 dark:bg-blue-900/20'    },
   { value: 'online', label: 'Online',         icon: Globe,       color: 'text-teal-600 dark:text-teal-400',    bg: 'bg-teal-50 dark:bg-teal-900/20'    },
   { value: 'baby',   label: 'Baby',           icon: Baby,        color: 'text-pink-600 dark:text-pink-400',    bg: 'bg-pink-50 dark:bg-pink-900/20'    },
+  { value: 'food',   label: 'Food Items',     icon: Utensils,    color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-900/20'  },
 ];
 
 function getTypeConfig(type) {
@@ -131,6 +132,7 @@ export default function IndiaListPage() {
     if (filter === 'parcel')  return i.type === 'parcel' && !i.done;
     if (filter === 'online')  return i.type === 'online' && !i.done;
     if (filter === 'baby')    return i.type === 'baby'   && !i.done;
+    if (filter === 'food')    return i.type === 'food'   && !i.done;
     if (filter === 'pending') return !i.done;
     if (filter === 'done')    return !!i.done;
     return true;
@@ -185,6 +187,7 @@ export default function IndiaListPage() {
     { key: 'parcel',  label: 'Parcel' },
     { key: 'online',  label: 'Online' },
     { key: 'baby',    label: 'Baby' },
+    { key: 'food',    label: 'Food' },
     { key: 'done',    label: 'Done' },
   ];
 
