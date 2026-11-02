@@ -118,11 +118,13 @@ export default function IndiaListPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [localOrder, setLocalOrder] = useState(null);
   const [filter, setFilter] = useState('all'); // all | buy | parcel | pending | done
+  const [locationFilter, setLocationFilter] = useState(''); // '' | TN | AP
   const dragId = useRef(null);
 
   const serverItems = data?.data ?? [];
 
   const filtered = serverItems.filter((i) => {
+    if (locationFilter && i.location !== locationFilter) return false;
     if (filter === 'buy')     return i.type === 'buy'    && !i.done;
     if (filter === 'parcel')  return i.type === 'parcel' && !i.done;
     if (filter === 'pending') return !i.done;
@@ -198,7 +200,7 @@ export default function IndiaListPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-wrap">
         {FILTERS.map(({ key, label }) => (
           <button
             key={key}
@@ -206,6 +208,20 @@ export default function IndiaListPage() {
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
               filter === key
                 ? 'bg-orange-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+        {[['', 'All Locations'], ['TN', 'TN'], ['AP', 'AP']].map(([val, label]) => (
+          <button
+            key={val || 'all-loc'}
+            onClick={() => { setLocationFilter(val); setLocalOrder(null); }}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              locationFilter === val
+                ? (val === 'TN' ? 'bg-sky-500 text-white' : val === 'AP' ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-white dark:bg-gray-100 dark:text-gray-900')
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
