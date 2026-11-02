@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Trash2, Pencil, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, X, Zap, Plus, Settings2 } from 'lucide-react';
+import { Trash2, Pencil, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Search, X, Zap, Plus, Settings2, MapPin } from 'lucide-react';
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense } from '../hooks/useExpenses';
 import { useLedgerPresets, useCreateLedgerPreset, useUpdateLedgerPreset, useDeleteLedgerPreset } from '../hooks/useLedgerPresets';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -30,12 +30,14 @@ export default function IndiaLedgerPage() {
   const today = new Date().toLocaleDateString('en-CA');
 
   const [typeFilter, setTypeFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [activeType, setActiveType] = useState('debit');
+  const [activeLocation, setActiveLocation] = useState('TN');
   const [quickPreset, setQuickPreset] = useState(null);
   const [managePresets, setManagePresets] = useState(false);
   const [presetTarget, setPresetTarget] = useState(null);
@@ -57,6 +59,7 @@ export default function IndiaLedgerPage() {
     sort: 'date',
     order: 'desc',
     ...(typeFilter ? { type: typeFilter } : {}),
+    ...(locationFilter ? { location: locationFilter } : {}),
     ...(search ? { search } : {}),
   };
 
@@ -73,7 +76,7 @@ export default function IndiaLedgerPage() {
 
   async function onSubmit(data) {
     try {
-      await create.mutateAsync({ description: data.description, amount: parseFloat(data.amount), date: data.date, type: activeType, notes: data.notes || null });
+      await create.mutateAsync({ description: data.description, amount: parseFloat(data.amount), date: data.date, type: activeType, location: activeLocation, notes: data.notes || null });
       toast(activeType === 'credit' ? 'Credit recorded' : 'Debit recorded');
       reset({ description: '', amount: '', date: today, notes: '' });
     } catch (err) {
@@ -209,6 +212,24 @@ export default function IndiaLedgerPage() {
           </button>
         </div>
 
+        {/* Location toggle */}
+        <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveLocation('TN')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition-colors ${activeLocation === 'TN' ? 'bg-sky-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          >
+            <MapPin size={15} /> TN
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveLocation('AP')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition-colors ${activeLocation === 'AP' ? 'bg-indigo-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+          >
+            <MapPin size={15} /> AP
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div>
             <input
@@ -268,6 +289,17 @@ export default function IndiaLedgerPage() {
               </button>
             ))}
           </div>
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-medium">
+            {[['', 'All'], ['TN', 'TN'], ['AP', 'AP']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => { setLocationFilter(val); setPage(1); }}
+                className={`px-3 py-1.5 transition-colors ${locationFilter === val ? (val === 'TN' ? 'bg-sky-500 text-white' : val === 'AP' ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-white dark:bg-gray-100 dark:text-gray-900') : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -297,7 +329,14 @@ export default function IndiaLedgerPage() {
                     }
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{e.description}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{e.description}</p>
+                      {e.location && (
+                        <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${e.location === 'TN' ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'}`}>
+                          {e.location}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-400">{e.date}{e.notes ? ` · ${e.notes}` : ''}</p>
                   </div>
                   <p className={`text-sm font-bold shrink-0 ${e.type === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
@@ -526,6 +565,7 @@ function EditModal({ entry, onClose, onSave, isSaving }) {
       amount: entry.amount,
       date: entry.date,
       type: entry.type,
+      location: entry.location ?? '',
       notes: entry.notes ?? '',
     },
   });
@@ -540,12 +580,22 @@ function EditModal({ entry, onClose, onSave, isSaving }) {
           </button>
         </div>
         <form onSubmit={handleSubmit(onSave)} className="p-5 space-y-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Type</label>
-            <select {...register('type')} className={inputCls}>
-              <option value="debit">Debit</option>
-              <option value="credit">Credit</option>
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Type</label>
+              <select {...register('type')} className={inputCls}>
+                <option value="debit">Debit</option>
+                <option value="credit">Credit</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Location</label>
+              <select {...register('location')} className={inputCls}>
+                <option value="">—</option>
+                <option value="TN">TN</option>
+                <option value="AP">AP</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Description</label>
