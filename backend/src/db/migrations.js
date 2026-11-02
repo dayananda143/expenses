@@ -394,6 +394,7 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_india_list_workspace ON india_list_items(workspace);
   `);
+  try { db.exec("ALTER TABLE india_list_items ADD COLUMN location TEXT DEFAULT NULL CHECK(location IN ('TN','AP') OR location IS NULL)"); } catch {}
 
   // Ledger presets (quick-add templates for credit/debit entries)
   db.exec(`

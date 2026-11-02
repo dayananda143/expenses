@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2, X, GripVertical, ShoppingBag, Package, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, GripVertical, ShoppingBag, Package, Check, MapPin } from 'lucide-react';
 import {
   useIndiaList, useCreateIndiaListItem, useUpdateIndiaListItem,
   useToggleIndiaListItem, useDeleteIndiaListItem, useReorderIndiaList,
@@ -28,13 +28,13 @@ function ItemModal({ item, onClose }) {
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
     defaultValues: item
-      ? { name: item.name, type: item.type, notes: item.notes ?? '' }
-      : { name: '', type: 'buy', notes: '' },
+      ? { name: item.name, type: item.type, location: item.location ?? '', notes: item.notes ?? '' }
+      : { name: '', type: 'buy', location: '', notes: '' },
   });
 
   async function onSubmit(data) {
     try {
-      const payload = { name: data.name.trim(), type: data.type, notes: data.notes?.trim() || null };
+      const payload = { name: data.name.trim(), type: data.type, location: data.location || null, notes: data.notes?.trim() || null };
       if (isEdit) { await update.mutateAsync({ id: item.id, ...payload, done: item.done }); toast('Item updated'); }
       else        { await create.mutateAsync(payload); toast('Item added'); }
       onClose();
@@ -42,6 +42,7 @@ function ItemModal({ item, onClose }) {
   }
 
   const type = watch('type');
+  const location = watch('location');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -67,6 +68,24 @@ function ItemModal({ item, onClose }) {
                 }`}>
                   <input type="radio" value={value} {...register('type')} className="sr-only" />
                   <Icon size={14} />{label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location <span className="text-xs text-gray-400 font-normal">(optional)</span></label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'TN', color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+                { value: 'AP', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+              ].map(({ value, color, bg }) => (
+                <label key={value} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition-all text-sm font-medium ${
+                  location === value
+                    ? `border-current ${color} ${bg}`
+                    : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+                }`}>
+                  <input type="radio" value={value} {...register('location')} className="sr-only" />
+                  <MapPin size={14} />{value}
                 </label>
               ))}
             </div>
@@ -250,6 +269,11 @@ export default function IndiaListPage() {
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`text-[11px] font-medium ${typeConfig.color}`}>{typeConfig.label}</span>
+                    {item.location && (
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${item.location === 'TN' ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'}`}>
+                        {item.location}
+                      </span>
+                    )}
                     {item.notes && <span className="text-[11px] text-gray-400 truncate">· {item.notes}</span>}
                   </div>
                 </div>

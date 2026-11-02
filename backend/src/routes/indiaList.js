@@ -18,12 +18,13 @@ router.get('/', (req, res, next) => {
 // POST /api/india-list
 router.post('/', (req, res, next) => {
   try {
-    const { name, notes, type } = req.body;
+    const { name, notes, type, location } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
     const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order),0) AS m FROM india_list_items WHERE workspace = ?').get(req.workspace).m;
+    const locationValue = location === 'TN' || location === 'AP' ? location : null;
     const result = db.prepare(
-      'INSERT INTO india_list_items (workspace, name, notes, type, sort_order) VALUES (?, ?, ?, ?, ?)'
-    ).run(req.workspace, name.trim(), notes?.trim() || null, type?.trim() || 'buy', maxOrder + 1);
+      'INSERT INTO india_list_items (workspace, name, notes, type, sort_order, location) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(req.workspace, name.trim(), notes?.trim() || null, type?.trim() || 'buy', maxOrder + 1, locationValue);
     res.status(201).json({ data: db.prepare('SELECT * FROM india_list_items WHERE id = ?').get(result.lastInsertRowid) });
   } catch (err) { next(err); }
 });
@@ -33,10 +34,11 @@ router.put('/:id', (req, res, next) => {
   try {
     const item = db.prepare('SELECT * FROM india_list_items WHERE id = ? AND workspace = ?').get(req.params.id, req.workspace);
     if (!item) return res.status(404).json({ error: 'Not found' });
-    const { name, notes, type, done } = req.body;
+    const { name, notes, type, done, location } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
-    db.prepare('UPDATE india_list_items SET name=?, notes=?, type=?, done=? WHERE id=?')
-      .run(name.trim(), notes?.trim() || null, type?.trim() || 'buy', done ? 1 : 0, item.id);
+    const locationValue = location === 'TN' || location === 'AP' ? location : null;
+    db.prepare('UPDATE india_list_items SET name=?, notes=?, type=?, done=?, location=? WHERE id=?')
+      .run(name.trim(), notes?.trim() || null, type?.trim() || 'buy', done ? 1 : 0, locationValue, item.id);
     res.json({ data: db.prepare('SELECT * FROM india_list_items WHERE id = ?').get(item.id) });
   } catch (err) { next(err); }
 });
